@@ -28,13 +28,25 @@ final class DictationHUDController {
         panel.hasShadow = true
         panel.isMovable = false
         panel.hidesOnDeactivate = false
-        panel.contentView = NSHostingView(
+        let contentView = NSHostingView(
             rootView: DictationHUDView(controller: controller)
         )
+        panel.contentView = contentView
+        let click = NSClickGestureRecognizer(target: self, action: #selector(Self.openSettingsTapped))
+        contentView.addGestureRecognizer(click)
+    }
+
+    @objc private func openSettingsTapped() {
+        guard conflictMode else { return }
+        Self.openDictationSettings()
     }
 
     /// Shows the HUD centered above the key window (or screen center).
     func show() {
+        if conflictMode {
+            conflictMode = false
+            restoreSessionView()
+        }
         positionPanel()
         panel.orderFrontRegardless()
     }
@@ -42,6 +54,39 @@ final class DictationHUDController {
     /// Orders the HUD out.
     func hide() {
         panel.orderOut(nil)
+    }
+
+    /// Shows the conflict guidance panel instead of the session HUD; the
+    /// whole panel is tappable and re-opens System Settings > Keyboard >
+    /// Dictation. Auto-hides after a few seconds.
+    func showConflict() {
+        conflictMode = true
+        panel.contentView = NSHostingView(
+            rootView: DictationConflictView(onOpenSettings: Self.openDictationSettings)
+        )
+        positionPanel()
+        panel.orderFrontRegardless()
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard let self, self.conflictMode else { return }
+            self.conflictMode = false
+            self.restoreSessionView()
+            self.panel.orderOut(nil)
+        }
+    }
+
+    private var conflictMode = false
+
+    private func restoreSessionView() {
+        panel.contentView = NSHostingView(
+            rootView: DictationHUDView(controller: controller)
+        )
+    }
+
+    nonisolated static func openDictationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Dictation") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func positionPanel() {
@@ -57,6 +102,33 @@ final class DictationHUDController {
         let originX = anchor.midX - frame.width / 2
         let originY = anchor.maxY - frame.height - 72
         panel.setFrameOrigin(NSPoint(x: originX, y: originY))
+    }
+}
+
+/// Conflict guidance panel content — shown once when Apple's Globe/Fn
+/// dictation collides with cmux's triggers. Tapping opens Dictation settings.
+@MainActor
+struct DictationConflictView: View {
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(localized: "dictation.hud.conflict.title", defaultValue: "fn conflict with Apple Dictation"))
+                .font(.system(size: 12, weight: .semibold))
+            Text(String(localized: "dictation.hud.conflict.body", defaultValue: "Double-press fn also starts Apple Dictation. Tap to change it in Keyboard settings."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(width: 320)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.purple.opacity(0.45), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture(perform: onOpenSettings)
     }
 }
 

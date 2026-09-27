@@ -30,11 +30,16 @@ final class DictationCoordinator {
     /// Speech/AVFoundation startup work into launch.
     private lazy var controller = DictationController(
         makeSession: { SpeechDictationEngine() },
-        sink: DictationSurfaceTextSink(),
+        sink: DictationRoutingSink(
+            surfaceSink: DictationSurfaceTextSink(),
+            systemSink: SystemPasteboardInsertionSink()
+        ),
         authorization: .systemLive
     )
     /// Floating state HUD driven by the controller's phase stream.
     private lazy var hud = DictationHUDController(controller: controller)
+    /// Conflict guidance is announced once per app run, not on every trigger.
+    private var conflictAnnounced = false
     /// Phase consumer keeping the HUD lifecycle in sync.
     private var phaseTask: Task<Void, Never>?
 
@@ -116,6 +121,20 @@ final class DictationCoordinator {
         // While a shortcut recorder captures chords, fn presses must never
         // start a dictation session (same stand-down as the global hotkey).
         guard !KeyboardShortcutRecorderActivity.isAnyRecorderActive else { return }
+
+        // One-time Globe/Fn dictation-conflict guidance (mirrors Gemini's
+        // FnKeyConflictDetector): Apple's "press 🌐 twice" dictation would
+        // fire alongside ours. Guidance only — the session still runs.
+        if !conflictAnnounced {
+            conflictAnnounced = true
+            let detector = FnKeyConflictDetector(signals: .readSystemSignals())
+            if let reason = detector.conflictReason {
+                cmuxDebugLog("dictation.conflict \(reason)")
+                hud.showConflict()
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Dictation")!)
+            }
+        }
+
         cmuxDebugLog("dictation.trigger \(trigger)")
         switch trigger {
         case .doubleTap:

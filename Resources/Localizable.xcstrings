@@ -1,6 +1,34 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "dictation.hud.conflict.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {"stringUnit" : {"state" : "translated", "value" : "تعارض مفتاح fn مع إملاء Apple"}},
+        "de" : {"stringUnit" : {"state" : "translated", "value" : "fn kollidiert mit Apple-Diktat"}},
+        "en" : {"stringUnit" : {"state" : "translated", "value" : "fn conflict with Apple Dictation"}},
+        "es" : {"stringUnit" : {"state" : "translated", "value" : "fn entra en conflicto con el Dictado de Apple"}},
+        "fr" : {"stringUnit" : {"state" : "translated", "value" : "fn en conflit avec la dictée Apple"}},
+        "ja" : {"stringUnit" : {"state" : "translated", "value" : "fn が Apple 音声入力と競合しています"}},
+        "ko" : {"stringUnit" : {"state" : "translated", "value" : "fn이 Apple 받아쓰기와 충돌합니다"}},
+        "zh-Hant" : {"stringUnit" : {"state" : "translated", "value" : "fn 與 Apple 聽寫衝突"}},
+        "zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "fn 与 Apple 听写冲突"}}
+      }
+    },
+    "dictation.hud.conflict.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {"stringUnit" : {"state" : "translated", "value" : "النقر المزدوج على fn يشغّل إملاء Apple أيضًا. انقر لتغييره في إعدادات لوحة المفاتيح."}},
+        "de" : {"stringUnit" : {"state" : "translated", "value" : "Doppeltes fn startet auch das Apple-Diktat. Zum Ändern in den Tastatur-Einstellungen tippen."}},
+        "en" : {"stringUnit" : {"state" : "translated", "value" : "Double-press fn also starts Apple Dictation. Tap to change it in Keyboard settings."}},
+        "es" : {"stringUnit" : {"state" : "translated", "value" : "Pulsar fn dos veces también inicia el Dictado de Apple. Toque para cambiarlo en Ajustes de Teclado."}},
+        "fr" : {"stringUnit" : {"state" : "translated", "value" : "Le double-appui sur fn lance aussi la dictée Apple. Touchez pour modifier dans les réglages Clavier."}},
+        "ja" : {"stringUnit" : {"state" : "translated", "value" : "fn の2回押しで Apple 音声入力も開始します。タップしてキーボード設定で変更してください。"}},
+        "ko" : {"stringUnit" : {"state" : "translated", "value" : "fn 두 번 누르면 Apple 받아쓰기도 시작됩니다. 탭하여 키보드 설정에서 변경하세요."}},
+        "zh-Hant" : {"stringUnit" : {"state" : "translated", "value" : "雙擊 fn 也會啟動 Apple 聽寫。點按以在鍵盤設定中變更。"}},
+        "zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "双击 fn 也会启动 Apple 听写。点按以在键盘设置中更改。"}}
+      }
+    },
     "settings.betaFeatures.dictation": {
       "extractionState": "manual",
       "localizations": {
