@@ -1645,6 +1645,7 @@
 		DE000A010000000000000001 /* DevWindowDisplayDefault.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE000A010000000000000002 /* DevWindowDisplayDefault.swift */; };
 		D1C7A7000000000000000002 /* DictationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000001 /* DictationCoordinator.swift */; };
 		D1C7A7000000000000000004 /* DictationHUDController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000003 /* DictationHUDController.swift */; };
+		D1C7A7000000000000000008 /* DictationRoutingSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000007 /* DictationRoutingSink.swift */; };
 		D1C7A7000000000000000006 /* DictationSurfaceTextSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000005 /* DictationSurfaceTextSink.swift */; };
 		D1FFC0DE000000000000B002 /* DiffCommentsBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FFC0DE000000000000B001 /* DiffCommentsBridge.swift */; };
 		D1FFC0DE000000000000A002 /* DiffCommentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FFC0DE000000000000A001 /* DiffCommentStore.swift */; };
@@ -3248,6 +3249,7 @@
 		A7206F010000000000000001 /* SystemAppearanceObserverEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7206F020000000000000001 /* SystemAppearanceObserverEnvironment.swift */; };
 		A7206B010000000000000001 /* SystemAppearanceObserverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7206B020000000000000001 /* SystemAppearanceObserverTests.swift */; };
 		C7B0FACE000000000000000C /* SystemCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B0FACE000000000000000D /* SystemCommandRunner.swift */; };
+		D1C7A700000000000000000A /* SystemPasteboardInsertionSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000009 /* SystemPasteboardInsertionSink.swift */; };
 		FBE660ABA1854983B84368C6 /* SystemWideHotkeyShortcutPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65154DD251384EE0A2C8923A /* SystemWideHotkeyShortcutPolicyTests.swift */; };
 		C9A5720DC9A5720DC9A5720D /* TabItemView+WorkspaceContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A5720EC9A5720EC9A5720E /* TabItemView+WorkspaceContextMenu.swift */; };
 		C9A5720BC9A5720BC9A5720B /* TabItemView+WorkspaceGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A5720CC9A5720CC9A5720C /* TabItemView+WorkspaceGroups.swift */; };
@@ -5623,6 +5625,7 @@
 		DE000A010000000000000002 /* DevWindowDisplayDefault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevWindowDisplayDefault.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000001 /* DictationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DictationCoordinator.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000003 /* DictationHUDController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DictationHUDController.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000007 /* DictationRoutingSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DictationRoutingSink.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000005 /* DictationSurfaceTextSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DictationSurfaceTextSink.swift; sourceTree = "<group>"; };
 		D1FFC0DE000000000000B001 /* DiffCommentsBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/DiffCommentsBridge.swift; sourceTree = "<group>"; };
 		D1FFC0DE000000000000A001 /* DiffCommentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffCommentStore.swift; sourceTree = "<group>"; };
@@ -7202,6 +7205,7 @@
 		A7206F020000000000000001 /* SystemAppearanceObserverEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppearanceObserverEnvironment.swift; sourceTree = "<group>"; };
 		A7206B020000000000000001 /* SystemAppearanceObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppearanceObserverTests.swift; sourceTree = "<group>"; };
 		C7B0FACE000000000000000D /* SystemCommandRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCommandRunner.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000009 /* SystemPasteboardInsertionSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/SystemPasteboardInsertionSink.swift; sourceTree = "<group>"; };
 		65154DD251384EE0A2C8923A /* SystemWideHotkeyShortcutPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemWideHotkeyShortcutPolicyTests.swift; sourceTree = "<group>"; };
 		C9A5720EC9A5720EC9A5720E /* TabItemView+WorkspaceContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabItemView+WorkspaceContextMenu.swift"; sourceTree = "<group>"; };
 		C9A5720CC9A5720CC9A5720C /* TabItemView+WorkspaceGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TabItemView+WorkspaceGroups.swift"; sourceTree = "<group>"; };
@@ -10062,6 +10066,8 @@
 				D1C7A7000000000000000001 /* DictationCoordinator.swift */,
 				D1C7A7000000000000000003 /* DictationHUDController.swift */,
 				D1C7A7000000000000000005 /* DictationSurfaceTextSink.swift */,
+				D1C7A7000000000000000007 /* DictationRoutingSink.swift */,
+				D1C7A7000000000000000009 /* SystemPasteboardInsertionSink.swift */,
 				93840004AA11BB22CC33EE04 /* AgentRelayTTYTargetResolution.swift */,
 				89930002AABBCCDDEEFF0003 /* AgentProcessBindingResolution.swift */,
 				8362A0020000000000000002 /* TerminalCallerTTYResolver.swift */,
@@ -13635,6 +13641,7 @@
 				DE000A010000000000000001 /* DevWindowDisplayDefault.swift in Sources */,
 				D1C7A7000000000000000002 /* DictationCoordinator.swift in Sources */,
 				D1C7A7000000000000000004 /* DictationHUDController.swift in Sources */,
+				D1C7A7000000000000000008 /* DictationRoutingSink.swift in Sources */,
 				D1C7A7000000000000000006 /* DictationSurfaceTextSink.swift in Sources */,
 				D1FFC0DE000000000000B002 /* DiffCommentsBridge.swift in Sources */,
 				D1FFC0DE000000000000A002 /* DiffCommentStore.swift in Sources */,
@@ -14689,6 +14696,7 @@
 				A7206A010000000000000001 /* SystemAppearanceObserver.swift in Sources */,
 				A7206F010000000000000001 /* SystemAppearanceObserverEnvironment.swift in Sources */,
 				C7B0FACE000000000000000C /* SystemCommandRunner.swift in Sources */,
+				D1C7A700000000000000000A /* SystemPasteboardInsertionSink.swift in Sources */,
 				C9A5720DC9A5720DC9A5720D /* TabItemView+WorkspaceContextMenu.swift in Sources */,
 				C9A5720BC9A5720BC9A5720B /* TabItemView+WorkspaceGroups.swift in Sources */,
 				A5F100000000000000000005 /* TabItemView+WorkspaceNotificationsMenu.swift in Sources */,
