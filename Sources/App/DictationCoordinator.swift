@@ -127,7 +127,7 @@ final class DictationCoordinator {
         // fire alongside ours. Guidance only — the session still runs.
         if !conflictAnnounced {
             conflictAnnounced = true
-            let detector = FnKeyConflictDetector(signals: .readSystemSignals())
+            let detector = FnKeyConflictDetector(signals: FnKeyConflictDetector.readSystemSignals())
             if let reason = detector.conflictReason {
                 cmuxDebugLog("dictation.conflict \(reason)")
                 hud.showConflict()
