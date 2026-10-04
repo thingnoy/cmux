@@ -40,7 +40,8 @@ extension Workspace {
     ) -> Set<UUID> {
         guard let configuration = remoteConfiguration,
               configuration.preserveAfterTerminalExit == true else { return [] }
-        let candidateIDs = requestedSurfaceId.map { Set([$0]) } ?? remoteDisconnectPlaceholderPanelIds
+        let candidateIDs = requestedSurfaceId.map { Set([$0]) }
+            ?? remoteDisconnectPlaceholderPanelIds.union(pendingRemoteTerminalChildExitSurfaceIds)
         var reattached = Set<UUID>()
 
         for panelId in candidateIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
