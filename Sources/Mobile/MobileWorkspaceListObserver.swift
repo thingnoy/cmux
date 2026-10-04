@@ -66,9 +66,90 @@ final class MobileWorkspaceListObserver {
     private var hasWorkspaceListSubscribers: Bool {
         #if DEBUG
         if let override = Self.subscriberPresenceOverrideForTesting { return override }
+        if Self.probeLaunchArgumentPresent { return true }
         #endif
         return MobileHostService.hasEventSubscribers(topic: "workspace.updated")
     }
+
+    #if DEBUG
+    /// Host-only churn investigations: `-cmuxProbeWorkspaceObserver` forces the
+    /// subscriber-gated pipelines on (no phone needed) and starts a 1 Hz
+    /// per-field summary-hash diff logger. Never set in normal DEBUG runs.
+    static let probeLaunchArgumentPresent: Bool = ProcessInfo.processInfo.arguments
+        .contains("-cmuxProbeWorkspaceObserver")
+    private var probeTask: Task<Void, Never>?
+    private var lastProbeFields: [String: String]?
+
+    func startProbeIfNeeded() {
+        guard Self.probeLaunchArgumentPresent, probeTask == nil else { return }
+        probeTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.probeDiff()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    /// Computes the same inputs `summaryHash` folds together, one key per
+    /// logical field, and logs only the keys that changed since the last
+    /// probe tick so a host-only repro identifies the mutating field.
+    private func probeDiff() {
+        guard let tabManager else { return }
+        var fields: [String: String] = [:]
+        fields["selectedTab"] = (tabManager.selectedTabId?.uuidString.prefix(8) ?? "nil").description
+        let groupIcons = currentGroupIconSymbols(for: tabManager)
+        for group in tabManager.workspaceGroups {
+            let id = group.id.uuidString.prefix(8)
+            fields["group.\(id)"] = "\(group.name)|\(group.isCollapsed)|\(group.isPinned)|\(groupIcons[group.id] ?? group.iconSymbol)|\(group.liveAnchorWorkspaceId?.uuidString.prefix(8) ?? "nil")|\(group.isEmpty)"
+        }
+        let previews = currentPreviewSignatures(for: tabManager.tabs)
+        for workspace in tabManager.tabs {
+            let id = workspace.id.uuidString.prefix(8)
+            fields["ws.\(id).title"] = workspace.title
+            fields["ws.\(id).desc"] = workspace.customDescription
+            fields["ws.\(id).color"] = workspace.customColor?.description ?? "nil"
+            fields["ws.\(id).pin"] = workspace.isPinned.description
+            fields["ws.\(id).group"] = workspace.groupId.map { String($0.uuidString.prefix(8)) } ?? "nil"
+            fields["ws.\(id).preview"] = (previews[workspace.id] ?? 0).description
+            let panelIDs = workspace.orderedPanelIds
+            fields["ws.\(id).panels"] = panelIDs.map { $0.uuidString.prefix(8) }.joined(separator: ",")
+            var titles: [String] = []
+            var dirs: [String] = []
+            var sims: [String] = []
+            for panelID in panelIDs {
+                titles.append(workspace.panelTitle(panelId: panelID) ?? "nil")
+                dirs.append(workspace.reportedPanelDirectory(panelId: panelID) ?? "nil")
+                if let simulator = workspace.panels[panelID] as? SimulatorPanel {
+                    sims.append("\(simulator.selectedDeviceName)|\(simulator.selectedDeviceState)|\(simulator.coordinator.status.mobileWorkspaceObserverSignature)")
+                }
+            }
+            fields["ws.\(id).panelTitles"] = titles.joined(separator: "‸")
+            fields["ws.\(id).panelDirs"] = dirs.joined(separator: "‸")
+            fields["ws.\(id).sim"] = sims.joined(separator: "‸")
+            fields["ws.\(id).cwd"] = workspace.presentedCurrentDirectory
+            fields["ws.\(id).todo"] = "\(workspace.todoState.statusOverride)|\(workspace.todoState.statusHidden)|\(workspace.todoState.checklist.count)"
+            fields["ws.\(id).panelDirMap"] = workspace.panelDirectories.keys
+                .sorted()
+                .map { "\($0.uuidString.prefix(8))=\(workspace.panelDirectories[$0] ?? "nil")" }
+                .joined(separator: ",")
+        }
+        defer { lastProbeFields = fields }
+        guard let previous = lastProbeFields else { return }
+        let changed = Set(fields.keys).union(previous.keys)
+            .filter { fields[$0] != previous[$0] }
+            .sorted()
+        guard !changed.isEmpty else { return }
+        let summary = changed.map { key in
+            let old = previous[key] ?? "‹absent›"
+            let new = fields[key] ?? "‹absent›"
+            func clamp(_ value: String) -> String {
+                value.count > 90 ? String(value.prefix(90)) + "…" : value
+            }
+            return "\(key): \(clamp(old)) → \(clamp(new))"
+        }.joined(separator: " || ")
+        mobileWorkspaceObserverLog.notice("probe.diff \(summary, privacy: .public)")
+    }
+    #endif
 
     init(
         tabManager: TabManager,
@@ -106,6 +187,9 @@ final class MobileWorkspaceListObserver {
             }
         }
         reconcilePipelines()
+        #if DEBUG
+        startProbeIfNeeded()
+        #endif
     }
 
     func updateConfigStore(_ next: CmuxConfigStore?) {
