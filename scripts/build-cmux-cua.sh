@@ -367,7 +367,13 @@ for arch in "${ARCHS[@]}"; do
   # by source dir prevents cross-revision reuse. Concurrent builds of one
   # revision serialize on Cargo's own lock.
   target_dir="$SRC_ROOT/.cmux-cargo-target"
+  # xcodebuild injects the app's MACOSX_DEPLOYMENT_TARGET (14.0) into this
+  # phase. Under Xcode 27 beta, proc-macro dylibs linked at >= 14 are rejected
+  # by macOS 27 dyld ("mis-aligned LINKEDIT string pool"), so pin the cargo
+  # build to the linker-safe minimum. The shipped binary is independent of the
+  # host toolchain's proc-macro linkage; a lower minimum only widens it.
   CARGO_TARGET_DIR="$target_dir" \
+    MACOSX_DEPLOYMENT_TARGET="${CMUX_CUA_BUILD_MIN_MACOS:-11.0}" \
     cargo build --manifest-path "$CARGO_ROOT/Cargo.toml" --locked -p cmux-cua --release --target "$target"
   arch_output="$TMPDIR_BUILD/cmux-cua-$arch"
   cp "$target_dir/$target/release/cmux-cua" "$arch_output"

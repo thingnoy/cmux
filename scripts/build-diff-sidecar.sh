@@ -60,8 +60,13 @@ for arch in $requested_archs; do
   seen_targets="$seen_targets $target"
   ensure_rust_target "$target"
   target_dir="${BUILD_WORK_DIR}/${target}"
+  # xcodebuild injects the app's MACOSX_DEPLOYMENT_TARGET (14.0) into every
+  # script phase. Under Xcode 27 beta, proc-macro dylibs linked at >= 14 are
+  # rejected by macOS 27 dyld ("mis-aligned LINKEDIT string pool"), so pin the
+  # cargo build to the linker-safe minimum; the assembled binary is restamped
+  # to the app minimum below before verification.
   CARGO_TARGET_DIR="$target_dir" \
-    MACOSX_DEPLOYMENT_TARGET="${CMUX_DIFF_SIDECAR_MIN_MACOS:-14.0}" \
+    MACOSX_DEPLOYMENT_TARGET="${CMUX_DIFF_SIDECAR_BUILD_MIN_MACOS:-11.0}" \
     "$CARGO_RUNNER" build \
       --manifest-path "${CRATE_DIR}/Cargo.toml" \
       --bin "$BINARY_NAME" \
@@ -81,6 +86,23 @@ else
   lipo -create -output "$output_binary" "${binaries[@]}"
 fi
 chmod +x "$output_binary"
+
+# Xcode 27 beta's ld emits dylib LINKEDIT that macOS 27 dyld rejects as
+# "mis-aligned LINKEDIT string pool" whenever MACOSX_DEPLOYMENT_TARGET >= 14,
+# which breaks the in-phase proc-macro builds. Cargo therefore builds with
+# rustc's own deployment target; restamp the assembled binary to the app's
+# minimum macOS afterwards. vtool only rewrites LC_BUILD_VERSION.
+restamp_minos="${CMUX_DIFF_SIDECAR_MIN_MACOS:-14.0}"
+if command -v vtool >/dev/null 2>&1; then
+  for arch in $requested_archs; do
+    current_minos="$(otool -arch "$arch" -l "$output_binary" | awk '/LC_BUILD_VERSION/{f=1; next} f && /minos /{print $2; exit}')"
+    if [[ "$current_minos" != "$restamp_minos" ]]; then
+      vtool -arch "$arch" -set-build-version macos "$restamp_minos" "$restamp_minos" -replace \
+        -output "$output_binary.restamped" "$output_binary"
+      mv "$output_binary.restamped" "$output_binary"
+    fi
+  done
+fi
 "${ROOT}/scripts/verify-diff-sidecar-artifact.sh" "$output_binary" --archs "$requested_archs"
 
 if [[ -z "${TARGET_BUILD_DIR:-}" ]]; then

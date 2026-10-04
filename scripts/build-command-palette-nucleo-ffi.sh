@@ -82,7 +82,13 @@ for target in ${requested_targets}; do
   esac
   seen_targets="${seen_targets} ${target}"
   ensure_rust_target "$target"
-  cargo build --manifest-path "${CRATE_DIR}/Cargo.toml" --release --target "$target"
+  # xcodebuild injects the app's MACOSX_DEPLOYMENT_TARGET (14.0) into this
+  # phase. Under Xcode 27 beta, proc-macro dylibs linked at >= 14 are rejected
+  # by macOS 27 dyld ("mis-aligned LINKEDIT string pool"), so pin the cargo
+  # build to the linker-safe minimum. The runtime dylib stays backwards
+  # compatible; a lower minimum only widens compatibility.
+  MACOSX_DEPLOYMENT_TARGET="${CMUX_NUCLEO_FFI_BUILD_MIN_MACOS:-11.0}" \
+    cargo build --manifest-path "${CRATE_DIR}/Cargo.toml" --release --target "$target"
   source_lib="${CRATE_DIR}/target/${target}/release/${LIB_NAME}"
   if [ ! -f "${source_lib}" ]; then
     echo "error: expected nucleo FFI library at ${source_lib}" >&2
