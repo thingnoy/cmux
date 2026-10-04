@@ -76,6 +76,46 @@ struct SSHDeepSleepReattachTests {
     }
 
     @MainActor
+    @Test func connectedTransitionReattachesTransportDisconnectedChildExitSurfaces() throws {
+        let workspace = Workspace()
+        workspace.configureRemoteConnection(Self.persistentConfiguration(), autoConnect: false)
+        let first = try #require(workspace.focusedTerminalPanel)
+        let second = try #require(workspace.newTerminalSplit(
+            from: first.id,
+            orientation: .horizontal,
+            focus: false
+        ))
+        let originalSurfaces = [first.id: first.surface, second.id: second.surface]
+        // A mid-session daemon transport drop tears down the local wrapper
+        // while the daemon-side PTY session survives, so the surface lands in
+        // the child-exit set (markRemoteTerminalSessionEnded), never in the
+        // placeholder set.
+        workspace.untrackRemoteTerminalSurface(first.id)
+        workspace.pendingRemoteTerminalChildExitSurfaceIds.insert(first.id)
+        workspace.untrackRemoteTerminalSurface(second.id)
+        workspace.pendingRemoteTerminalChildExitSurfaceIds.insert(second.id)
+        #expect(!workspace.isRemoteTerminalSurface(first.id))
+        #expect(!workspace.isRemoteTerminalSurface(second.id))
+
+        workspace.applyRemoteConnectionStateUpdate(
+            .connected,
+            detail: "Connected to cmux-macmini via shared local proxy 127.0.0.1:64007",
+            target: "cmux-macmini"
+        )
+
+        #expect(workspace.pendingRemoteTerminalChildExitSurfaceIds.isEmpty)
+        for panelID in [first.id, second.id] {
+            let reattached = try #require(workspace.terminalPanel(for: panelID))
+            #expect(reattached.surface !== originalSurfaces[panelID])
+            let command = try #require(reattached.surface.initialCommand)
+            #expect(command.contains("--require-existing"))
+            #expect(command.contains(Workspace.defaultSSHPTYSessionID(workspaceId: workspace.id, panelId: panelID)))
+            #expect(workspace.isRemoteTerminalSurface(panelID))
+            #expect(!workspace.remoteDisconnectPlaceholderPanelIds.contains(panelID))
+        }
+    }
+
+    @MainActor
     @Test(arguments: [false, true])
     func contextMenuReconnectReattachesFailedPersistentPTY(pendingChildExit: Bool) throws {
         let previousAppDelegate = AppDelegate.shared
