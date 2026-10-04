@@ -13,8 +13,10 @@ public struct BetaFeaturesSection: View {
     @State private var extensions: DefaultsValueModel<Bool>
     @State private var customSidebars: DefaultsValueModel<Bool>
     @State private var remoteTmux: DefaultsValueModel<Bool>
+    @State private var predictedEcho: DefaultsValueModel<Bool>
     @State private var workspaceTodoControls: DefaultsValueModel<Bool>
     @State private var workspaceTodosChecklistStyle: DefaultsValueModel<WorkspaceTodoChecklistStyle>
+    @State private var dictation: DefaultsValueModel<Bool>
     /// `DisableCloud` (MDM). The opt-in is meaningless while an administrator
     /// forces Cloud off, so the row says so and locks the toggle; re-read on
     /// ``ManagedDevicePolicy/changeSignals(notificationCenter:)``.
@@ -30,8 +32,10 @@ public struct BetaFeaturesSection: View {
         _extensions = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.extensions))
         _customSidebars = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.customSidebars))
         _remoteTmux = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.remoteTmux))
+        _predictedEcho = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.predictedEcho))
         _workspaceTodoControls = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.workspaceTodoControls))
         _workspaceTodosChecklistStyle = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.workspaceTodosChecklistStyle))
+        _dictation = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.betaFeatures.dictation))
     }
 
     public var body: some View {
@@ -54,9 +58,13 @@ public struct BetaFeaturesSection: View {
                 SettingsCardDivider()
                 remoteTmuxRow
                 SettingsCardDivider()
+                predictedEchoRow
+                SettingsCardDivider()
                 workspaceTodoControlsRow
                 SettingsCardDivider()
                 workspaceTodosChecklistStyleRow
+                SettingsCardDivider()
+                dictationRow
             }
         }
         .task { startObservingSettings() }
@@ -77,8 +85,10 @@ public struct BetaFeaturesSection: View {
             extensions,
             customSidebars,
             remoteTmux,
+            predictedEcho,
             workspaceTodoControls,
             workspaceTodosChecklistStyle,
+            dictation,
         ]
         models.forEach { $0.startObserving() }
     }
@@ -171,8 +181,7 @@ public struct BetaFeaturesSection: View {
                     : String(localized: "settings.betaFeatures.cloudMachines.subtitleOff", defaultValue: "Hides every Cloud Machines surface unless remote rollout enables it.")
         ) {
             Toggle("", isOn: Binding(get: { cloudMachines.current && !cloudMachinesManagedByPolicy }, set: {
-                cloudMachines.set($0)
-                NotificationCenter.default.post(name: Notification.Name("rightSidebarBetaFeatureDidChange"), object: nil)
+                CloudMachinesBetaSettingAction(model: cloudMachines).setEnabled($0)
             }))
                 .labelsHidden()
                 .controlSize(.small)
@@ -215,6 +224,40 @@ public struct BetaFeaturesSection: View {
                 .controlSize(.small)
                 .disabled(customSidebarsManagedByPolicy)
                 .accessibilityIdentifier("SettingsBetaCustomSidebarsToggle")
+        }
+    }
+
+    @ViewBuilder
+    private var predictedEchoRow: some View {
+        SettingsCardRow(
+            configurationReview: .settingsOnly,
+            searchAnchorID: "setting:betaFeatures:predictedEcho",
+            String(localized: "settings.betaFeatures.predictedEcho", defaultValue: "Predictive local echo"),
+            subtitle: predictedEcho.current
+                ? String(localized: "settings.betaFeatures.predictedEcho.subtitleOn", defaultValue: "Shows characters you type over a slow remote link before the remote echoes them, underlined until confirmed. Stays off at a password prompt and inside full-screen applications.")
+                : String(localized: "settings.betaFeatures.predictedEcho.subtitleOff", defaultValue: "Waits for the remote to echo every character, so typing lags by one round trip.")
+        ) {
+            Toggle("", isOn: Binding(get: { predictedEcho.current }, set: { predictedEcho.set($0) }))
+                .labelsHidden()
+                .controlSize(.small)
+                .accessibilityIdentifier("SettingsBetaPredictedEchoToggle")
+        }
+    }
+
+    @ViewBuilder
+    private var dictationRow: some View {
+        SettingsCardRow(
+            configurationReview: .settingsOnly,
+            searchAnchorID: "setting:betaFeatures:dictation",
+            String(localized: "settings.betaFeatures.dictation", defaultValue: "Dictation"),
+            subtitle: dictation.current
+                ? String(localized: "settings.betaFeatures.dictation.subtitleOn", defaultValue: "Double-tap fn toggles dictation into the focused terminal; hold fn for push-to-talk. Uses on-device speech recognition when available.")
+                : String(localized: "settings.betaFeatures.dictation.subtitleOff", defaultValue: "Keeps the fn-key dictation triggers and microphone access off until you enable them here.")
+        ) {
+            Toggle("", isOn: Binding(get: { dictation.current }, set: { dictation.set($0) }))
+                .labelsHidden()
+                .controlSize(.small)
+                .accessibilityIdentifier("SettingsBetaDictationToggle")
         }
     }
 

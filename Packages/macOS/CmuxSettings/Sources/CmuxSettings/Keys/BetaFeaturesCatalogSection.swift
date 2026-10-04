@@ -96,5 +96,29 @@ public struct BetaFeaturesCatalogSection: SettingCatalogSection {
         userDefaultsKey: "remoteTmux.beta.enabled"
     )
 
+    /// Predictive local echo: draw typed characters over a remote terminal
+    /// before the remote echoes them, and withdraw them if the remote
+    /// disagrees. Only engages at a shell prompt on a link slow enough to
+    /// notice, never in a full-screen application, and never until the remote
+    /// has been seen echoing -- so a password prompt displays nothing.
+    /// Defaults off; while off the terminal input and output paths are
+    /// unchanged.
+    public let predictedEcho = DefaultsKey<Bool>(
+        id: "terminal.beta.predictedEcho.enabled",
+        defaultValue: false,
+        userDefaultsKey: "terminal.beta.predictedEcho.enabled"
+    )
+
+    /// Dictation: double-tap fn toggles voice dictation into the focused
+    /// terminal surface, hold fn is push-to-talk. Uses Apple's
+    /// `SFSpeechRecognizer` (on-device when supported) plus microphone access;
+    /// both permissions are requested lazily on the first trigger. Defaults
+    /// off; while off, the fn-key monitors stay inert and no mic capture runs.
+    public let dictation = DefaultsKey<Bool>(
+        id: "dictation.beta.enabled",
+        defaultValue: false,
+        userDefaultsKey: "dictation.beta.enabled"
+    )
+
     public init() {}
 }
