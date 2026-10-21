@@ -1596,7 +1596,7 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
     /// recovery the live identity is intentionally cleared before redial, so
     /// the retained target remains the ownership authority for distinguishing
     /// a same-Mac reconnect from a real Mac switch.
-    private var foregroundOrRecoveryMacKey: MacPairingKey {
+    var foregroundOrRecoveryMacKey: MacPairingKey {
         guard foregroundMacDeviceID == nil,
               let recoveryTargetMacDeviceID else {
             return foregroundMacKey
@@ -10148,7 +10148,9 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
         guard !isSubmittingComposerInput else { return false }
         isSubmittingComposerInput = true
         defer { isSubmittingComposerInput = false }
-        await awaitRemoteClientDuringConnectionRecovery(terminalID: terminalID)
+        guard await awaitRemoteClientDuringConnectionRecovery(terminalID: terminalID) else {
+            return false
+        }
         // Demonstration terminals are served locally, so they need no live
         // client; without this the composer fails its connection gate before
         // reaching the demo paste fence and shows the send-failure banner.
@@ -10234,13 +10236,10 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
         let attachments = pendingAttachments(forTerminalID: submittedTerminalID.rawValue)
         // A send that lands while recovery has retired the dead client waits
         // (bounded) for the replacement before the identity snapshot below, so
-        // every attachment send and the text use the new client. A sign-out,
-        // account switch, or Mac switch during that wait must not let the
-        // snapshot adopt the new session: the captured text was composed for
-        // the terminal that no longer exists there.
-        let waitSignInGeneration = signInGeneration
-        await awaitRemoteClientDuringConnectionRecovery(terminalID: submittedTerminalID)
-        guard signInGeneration == waitSignInGeneration,
+        // every attachment send and the text use the new client. The wait
+        // fails the send when it ends without that Mac's client in the same
+        // session, so the text submit below never waits a second time.
+        guard await awaitRemoteClientDuringConnectionRecovery(terminalID: submittedTerminalID),
               workspace(workspaceID, containsSurfaceID: submittedTerminalID.rawValue) else {
             return false
         }
