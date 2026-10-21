@@ -31,13 +31,15 @@ func makeRoutingConnectedStore(
     draftStore: (any TerminalDraftStoring)? = nil,
     deliveredNotificationClearer: any DeliveredNotificationClearing = NoopDeliveredNotificationClearer(),
     rpcRequestTimeoutNanoseconds: UInt64 = 30 * 1_000_000_000,
-    taskModelCatalogClient: MobileTaskModelCatalogClient = .live()
+    taskModelCatalogClient: MobileTaskModelCatalogClient = .live(),
+    reconnectAttemptDeadlineNanoseconds: UInt64 = 30 * 1_000_000_000
 ) async throws -> MobileShellComposite {
     let runtime = RoutingTestRuntime(
         transportFactory: RoutingTransportFactory(router: router),
         terminalLaneProvider: terminalLaneProvider,
         rpcRequestTimeoutNanoseconds: rpcRequestTimeoutNanoseconds,
-        supportedRouteKinds: [routeKind]
+        supportedRouteKinds: [routeKind],
+        reconnectAttemptDeadlineNanoseconds: reconnectAttemptDeadlineNanoseconds
     )
     let terminals = [
         MobileTerminalPreview(id: .init(rawValue: RoutingHostRouter.terminalA), name: "A"),
@@ -110,7 +112,11 @@ func makeRoutingConnectedStore(
 /// the mid-submit identity guard must abort BEFORE any further image or the text
 /// reaches this second router, so a test can assert that router recorded nothing.
 @MainActor
-func installFreshRemoteClient(on store: MobileShellComposite, router: RoutingHostRouter) throws {
+func installFreshRemoteClient(
+    on store: MobileShellComposite,
+    router: RoutingHostRouter,
+    macDeviceID: String = "test-mac-2"
+) throws {
     let runtime = RoutingTestRuntime(
         transportFactory: RoutingTransportFactory(router: router)
     )
@@ -122,7 +128,7 @@ func installFreshRemoteClient(on store: MobileShellComposite, router: RoutingHos
     let ticket = try CmxAttachTicket(
         workspaceID: RoutingHostRouter.workspaceID,
         terminalID: RoutingHostRouter.terminalA,
-        macDeviceID: "test-mac-2",
+        macDeviceID: macDeviceID,
         macDisplayName: "Test Mac 2",
         routes: [route],
         expiresAt: Date().addingTimeInterval(3600)
@@ -133,7 +139,7 @@ func installFreshRemoteClient(on store: MobileShellComposite, router: RoutingHos
         ticket: ticket,
         allowsStackAuthFallback: true
     )
-    store.foregroundMacDeviceID = "test-mac-2"
+    store.foregroundMacDeviceID = macDeviceID
 }
 
 /// Install a live read-only secondary client on `store`, backed by `router`.
