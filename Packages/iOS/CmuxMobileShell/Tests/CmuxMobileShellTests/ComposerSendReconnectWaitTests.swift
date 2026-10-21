@@ -47,7 +47,11 @@ import Testing
         #expect(store.terminalSendStatus(forTerminalID: Self.terminalID) == .sending)
 
         let replacementRouter = RoutingHostRouter()
-        try installFreshRemoteClient(on: store, router: replacementRouter)
+        try installFreshRemoteClient(
+            on: store,
+            router: replacementRouter,
+            macDeviceID: "test-mac"
+        )
 
         #expect(await submit.value)
         let pastes = await replacementRouter.recordedPastes()
@@ -56,6 +60,63 @@ import Testing
         #expect(await router.recordedPastes().isEmpty)
         #expect(store.terminalSendStatus(forTerminalID: Self.terminalID) == .sent)
         #expect(store.terminalInputText == "")
+    }
+
+    /// The text was composed for a terminal on the Mac being redialed. A Mac
+    /// switch that installs another Mac's client during the wait must not
+    /// receive it, even when that Mac reports the same terminal id.
+    @Test(arguments: [false, true])
+    func sendDuringRecoveryFailsWhenAnotherMacsClientArrives(
+        textOnlyEntryPoint: Bool
+    ) async throws {
+        let router = RoutingHostRouter()
+        let store = try await makeRoutingConnectedStore(router: router)
+        store.selectTerminal(MobileTerminalPreview.ID(rawValue: Self.terminalID))
+        store.terminalInputText = "hello"
+        _ = try retireClientForRecovery(store)
+
+        let submit = Task {
+            textOnlyEntryPoint
+                ? await store.submitComposerInput()
+                : await store.submitComposer()
+        }
+        #expect(try await pollUntil { !store.composerSendClientWaiters.isEmpty })
+
+        let otherMacRouter = RoutingHostRouter()
+        try installFreshRemoteClient(
+            on: store,
+            router: otherMacRouter,
+            macDeviceID: "test-mac-2"
+        )
+
+        #expect(await submit.value == false)
+        #expect(await otherMacRouter.recordedPastes().isEmpty)
+        #expect(store.terminalInputText == "hello")
+    }
+
+    /// A send whose bounded wait ended with no client fails then. It must not
+    /// start a second wait in the text submit, where a late client would get
+    /// the text without the checks made after the first wait.
+    @Test func sendFailsAfterTheFirstWaitWithoutWaitingAgain() async throws {
+        let router = RoutingHostRouter()
+        let store = try await makeRoutingConnectedStore(
+            router: router,
+            reconnectAttemptDeadlineNanoseconds: 300_000_000
+        )
+        store.selectTerminal(MobileTerminalPreview.ID(rawValue: Self.terminalID))
+        store.terminalInputText = "hello"
+        _ = try retireClientForRecovery(store)
+
+        let submit = Task { await store.submitComposer() }
+        // Past the first wait's deadline, inside where a second wait would run.
+        try await Task.sleep(for: .milliseconds(450))
+        let lateRouter = RoutingHostRouter()
+        try installFreshRemoteClient(on: store, router: lateRouter, macDeviceID: "test-mac")
+
+        #expect(await submit.value == false)
+        #expect(await lateRouter.recordedPastes().isEmpty)
+        #expect(store.terminalSendStatus(forTerminalID: Self.terminalID) == .failed)
+        #expect(store.terminalInputText == "hello")
     }
 
     @Test func sendWithoutClientAndNoRecoveryFailsImmediately() async throws {
