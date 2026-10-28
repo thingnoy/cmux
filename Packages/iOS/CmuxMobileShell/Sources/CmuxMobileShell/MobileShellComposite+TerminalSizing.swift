@@ -1,3 +1,4 @@
+internal import CMUXMobileCore
 internal import CmuxMobileDiagnostics
 internal import CmuxMobileRPC
 public import CmuxMobileShellModel
@@ -99,6 +100,30 @@ extension MobileShellComposite {
         // `.reassertViewport` is carried by `viewportReassertGeneration`,
         // which the mounted surface observes.
         terminalSizingBySurfaceID[surfaceID] = surface
+        claimTerminalFillScreenIfNeeded(surfaceID: surfaceID)
+    }
+
+    /// Lets a letterboxed phone take a terminal it shares under the default
+    /// policy: follow the latest device, with this phone counted, so the grid
+    /// fills whichever device was used last.
+    private func claimTerminalFillScreenIfNeeded(surfaceID: String) {
+        guard !terminalFillScreenClaimedSurfaceIDs.contains(surfaceID),
+              let surface = terminalSizingBySurfaceID[surfaceID],
+              surface.state?.isFillScreenClaimable(
+                  by: surface.selfParticipantID ?? defaultTerminalParticipantID
+              ) == true,
+              MobileTerminalFillScreenPreference(defaults: terminalFillScreenDefaults).isEnabled
+        else { return }
+        terminalFillScreenClaimedSurfaceIDs.insert(surfaceID)
+        Task {
+            // Counts first: under fit-everyone it leaves the grid unchanged, so
+            // the phone never briefly shows the Mac's grid between the two.
+            guard await setTerminalCountsOverride(true, surfaceID: surfaceID),
+                  await setTerminalSizePolicy(.latest, surfaceID: surfaceID) else {
+                terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
+                return
+            }
+        }
     }
 
     /// Applies a `detached` push.

@@ -1708,6 +1708,12 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
     /// Where the fill-screen-when-shared preference is read. Tests inject a
     /// suite-scoped `UserDefaults`.
     @ObservationIgnored var terminalFillScreenDefaults: UserDefaults = .standard
+    /// Terminals this phone already claimed to fill its screen. Never cleared,
+    /// so a policy the user picks afterwards in the size sheet stays.
+    // debt: in memory only. After a relaunch a terminal the user set back to
+    // Fit everyone, with no counts choice, is claimed again; persist the ids
+    // per Mac if that shows up.
+    @ObservationIgnored var terminalFillScreenClaimedSurfaceIDs: Set<String> = []
     /// Monotonic viewport fences scoped to the Mac app instance that consumes
     /// them. Warm Iroh focus swaps keep both peer connections alive, so their
     /// counters must survive independently for the signed-in account lifetime.
