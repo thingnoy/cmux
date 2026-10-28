@@ -128,6 +128,17 @@ public final class MobileDisplaySettings {
         }
     }
 
+    /// Whether the phone takes over the size of a terminal it shares with
+    /// the Mac when the shared grid letterboxes it. Defaults to
+    /// `true`. Mutating this
+    /// writes through to the injected ``UserDefaults`` under the shared
+    /// preference key the shell reads when a size state arrives.
+    public var fillScreenWhenShared: Bool {
+        didSet {
+            defaults.set(fillScreenWhenShared, forKey: MobileTerminalFillScreenPreference.defaultsKey)
+        }
+    }
+
     /// Whether cmux emits app-owned haptic feedback. Defaults to `true`.
     /// This is the sole observed writer for the persisted preference; haptic
     /// emitters read the same defaults store through ``haptics``.
@@ -254,6 +265,7 @@ public final class MobileDisplaySettings {
         self.handoffTerminalSizingWhenInactive = defaults.object(
             forKey: Self.handoffTerminalSizingWhenInactiveKey
         ) as? Bool ?? false
+        self.fillScreenWhenShared = MobileTerminalFillScreenPreference(defaults: defaults).isEnabled
         self.hapticFeedbackEnabled = haptics.isEnabled
         self.terminalScrollbackRows = MobileTerminalScrollbackPreference.resolve(from: defaults)
         let storedPreviewLines = defaults.object(forKey: Self.workspacePreviewLineCountKey) as? Int
