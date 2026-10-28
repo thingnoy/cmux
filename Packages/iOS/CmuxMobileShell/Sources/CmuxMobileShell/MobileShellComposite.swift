@@ -1705,6 +1705,9 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
     /// Shared sizing state per terminal surface (size state, self participant,
     /// attachment). See `MobileShellComposite+TerminalSizing.swift`.
     var terminalSizingBySurfaceID: [String: MobileTerminalSizingSurface] = [:]
+    /// Where the fill-screen-when-shared preference is read. Tests inject a
+    /// suite-scoped `UserDefaults`.
+    @ObservationIgnored var terminalFillScreenDefaults: UserDefaults = .standard
     /// Monotonic viewport fences scoped to the Mac app instance that consumes
     /// them. Warm Iroh focus swaps keep both peer connections alive, so their
     /// counters must survive independently for the signed-in account lifetime.

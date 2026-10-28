@@ -34,6 +34,8 @@ actor LivenessHostRouter {
         var stackAccessToken: String?
         var deviceKind: String?
         var deviceName: String?
+        var policyMode: String?
+        var countsOverride: Bool?
     }
 
     private var recorded: [RecordedRequest] = []
@@ -137,7 +139,9 @@ actor LivenessHostRouter {
         attachToken: String? = nil,
         stackAccessToken: String? = nil,
         deviceKind: String? = nil,
-        deviceName: String? = nil
+        deviceName: String? = nil,
+        policyMode: String? = nil,
+        countsOverride: Bool? = nil
     ) {
         recorded.append(RecordedRequest(
             method: method,
@@ -154,7 +158,9 @@ actor LivenessHostRouter {
             attachToken: attachToken,
             stackAccessToken: stackAccessToken,
             deviceKind: deviceKind,
-            deviceName: deviceName
+            deviceName: deviceName,
+            policyMode: policyMode,
+            countsOverride: countsOverride
         ))
         resumeSatisfiedCountWaiters()
     }
@@ -765,6 +771,8 @@ actor LivenessHostRouter {
             var result: [String: Any] = [:]
             if let viewportReport = viewportEffectiveGridOverride ?? viewportReport { result["columns"] = viewportReport.columns; result["rows"] = viewportReport.rows }
             return try? Self.resultFrame(id: id, result: result)
+        case "mobile.terminal.size_policy.set":
+            return try? Self.resultFrame(id: id, result: [:])
         case "terminal.input":
             let terminalSequence = terminalInputSequences.isEmpty
                 ? 100
@@ -898,7 +906,9 @@ actor LivenessTransport: CmxByteTransport, CmxByteTransportLivenessObserving {
                 attachToken: auth?["attach_token"] as? String,
                 stackAccessToken: auth?["stack_access_token"] as? String,
                 deviceKind: params?["device_kind"] as? String,
-                deviceName: params?["device_name"] as? String
+                deviceName: params?["device_name"] as? String,
+                policyMode: (params?["policy"] as? [String: Any])?["mode"] as? String,
+                countsOverride: params?["counts_override"] as? Bool
             )
             // Answer each request concurrently so one held response cannot
             // head-of-line block later RPCs, matching the Mac host's
