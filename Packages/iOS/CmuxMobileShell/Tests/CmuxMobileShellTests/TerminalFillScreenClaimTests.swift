@@ -122,6 +122,30 @@ private func claimed(_ router: LivenessHostRouter, atLeast count: Int = 1) async
         output.unmount()
     }
 
+    /// A backgrounded phone hands its viewport back, and the Mac treats its
+    /// return as a fresh attach without the counts override. Under its own
+    /// priority claim the phone then does not count, and the Mac keeps the
+    /// grid, so the phone counts itself again without resending the policy.
+    @Test func phoneBackFromHandOffCountsItselfAgain() async throws {
+        let router = LivenessHostRouter()
+        let (store, output) = try await makeStore(router: router)
+        let phoneFirst = TerminalSizingPolicy(mode: .priority, priority: [phonePriorityKey])
+
+        store.handleTerminalSizeStateEvent(try sizeStateEnvelope())
+        #expect(await router.waitForCount(of: "mobile.terminal.size_policy.set", atLeast: 1))
+        #expect(try await pollUntil { await countsOverrideReports(router) == [true] })
+
+        store.handleTerminalSizeStateEvent(
+            try sizeStateEnvelope(grid: phoneViewport, policy: phoneFirst, phoneCountsOverride: true)
+        )
+        store.handleTerminalSizeStateEvent(try sizeStateEnvelope(grid: (120, 44), policy: phoneFirst))
+
+        let recounted = try await pollUntil { await countsOverrideReports(router) == [true, true] }
+        #expect(recounted, "the returning phone must count itself again")
+        #expect(!(await claimed(router, atLeast: 2)), "the policy is already this phone's")
+        output.unmount()
+    }
+
     @Test func followLatestClaimFromBuildSevenMovesToPriority() async throws {
         let router = LivenessHostRouter()
         let (store, output) = try await makeStore(router: router)
@@ -140,7 +164,6 @@ private func claimed(_ router: LivenessHostRouter, atLeast count: Int = 1) async
     @Test(arguments: [
         TerminalSizingPolicy.latest,
         TerminalSizingPolicy(mode: .priority, priority: ["u_maya/mac"]),
-        TerminalSizingPolicy(mode: .priority, priority: [phonePriorityKey]),
         TerminalSizingPolicy(mode: .smallest, priority: ["u_maya/mac"]),
     ])
     func userChosenPolicyIsLeftAlone(policy: TerminalSizingPolicy) async throws {

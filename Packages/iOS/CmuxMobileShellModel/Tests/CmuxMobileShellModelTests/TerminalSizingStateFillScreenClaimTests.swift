@@ -4,6 +4,7 @@ import Testing
 
 private let phoneID = "mobile:phone"
 private let phoneFirst = TerminalSizingPolicy(mode: .priority, priority: ["u_maya/iphone/phone-device"])
+private let claimFirst = TerminalFillScreenClaim(countsThisPhone: true, policy: phoneFirst)
 
 private func phone(
     viewport: TerminalGridSize? = TerminalGridSize(cols: 72, rows: 60),
@@ -44,12 +45,12 @@ private func state(
 
 @Suite struct TerminalSizingStateFillScreenClaimTests {
     @Test func letterboxedInEitherDimensionPutsThisPhoneFirst() {
-        #expect(state().fillScreenPolicy(for: phoneID) == phoneFirst)
-        #expect(state(grid: TerminalGridSize(cols: 60, rows: 60)).fillScreenPolicy(for: phoneID) == phoneFirst)
+        #expect(state().fillScreenClaim(for: phoneID) == claimFirst)
+        #expect(state(grid: TerminalGridSize(cols: 60, rows: 60)).fillScreenClaim(for: phoneID) == claimFirst)
     }
 
     @Test func gridThatFillsThePhoneUnderTheDefaultIsLeftAlone() {
-        #expect(state(grid: TerminalGridSize(cols: 72, rows: 60)).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(grid: TerminalGridSize(cols: 72, rows: 60)).fillScreenClaim(for: phoneID) == nil)
     }
 
     /// Build 7 set follow-latest with the phone counted. Any Mac keystroke then
@@ -61,24 +62,32 @@ private func state(
             policy: .latest,
             phone: phone(countsOverride: true)
         )
-        #expect(claimed.fillScreenPolicy(for: phoneID) == phoneFirst)
+        #expect(claimed.fillScreenClaim(for: phoneID) == TerminalFillScreenClaim(countsThisPhone: false, policy: phoneFirst))
+    }
+
+    /// Back from a hand-off the phone reattaches without its counts override,
+    /// so under its own priority claim it stops counting and letterboxes.
+    @Test func ownPriorityClaimWithoutCountsCountsAgain() {
+        let returned = state(policy: phoneFirst)
+        #expect(returned.fillScreenClaim(for: phoneID) == TerminalFillScreenClaim(countsThisPhone: true, policy: nil))
+        #expect(state(policy: phoneFirst, phone: phone(countsOverride: true)).fillScreenClaim(for: phoneID) == nil)
+        #expect(state(policy: phoneFirst, phone: phone(countsOverride: false)).fillScreenClaim(for: phoneID) == nil)
     }
 
     @Test func followLatestWithoutTheCountsClaimIsLeftAlone() {
-        #expect(state(policy: .latest).fillScreenPolicy(for: phoneID) == nil)
-        #expect(state(policy: .latest, phone: phone(countsOverride: false)).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(policy: .latest).fillScreenClaim(for: phoneID) == nil)
+        #expect(state(policy: .latest, phone: phone(countsOverride: false)).fillScreenClaim(for: phoneID) == nil)
     }
 
     @Test func otherPoliciesAndCountsChoicesAreLeftAlone() {
         let fixed = TerminalSizingPolicy(mode: .fixed, fixed: TerminalGridSize(cols: 60, rows: 30))
-        #expect(state(policy: fixed).fillScreenPolicy(for: phoneID) == nil)
-        #expect(state(policy: phoneFirst).fillScreenPolicy(for: phoneID) == nil)
-        #expect(state(phone: phone(countsOverride: true)).fillScreenPolicy(for: phoneID) == nil)
-        #expect(state(phone: phone(countsOverride: false)).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(policy: fixed).fillScreenClaim(for: phoneID) == nil)
+        #expect(state(phone: phone(countsOverride: true)).fillScreenClaim(for: phoneID) == nil)
+        #expect(state(phone: phone(countsOverride: false)).fillScreenClaim(for: phoneID) == nil)
     }
 
     @Test func phoneMissingFromStateOrWithoutViewportIsLeftAlone() {
-        #expect(state(phone: nil).fillScreenPolicy(for: phoneID) == nil)
-        #expect(state(phone: phone(viewport: nil)).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(phone: nil).fillScreenClaim(for: phoneID) == nil)
+        #expect(state(phone: phone(viewport: nil)).fillScreenClaim(for: phoneID) == nil)
     }
 }
