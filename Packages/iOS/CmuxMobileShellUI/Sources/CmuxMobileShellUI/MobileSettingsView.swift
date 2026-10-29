@@ -331,7 +331,7 @@ struct MobileSettingsView: View {
                             ))
                             Text(L10n.string(
                                 "mobile.settings.fillScreenWhenShared.description",
-                                defaultValue: "When a terminal is also open on your Mac, size it for the device you used last instead of fitting both."
+                                defaultValue: "When a terminal is also open on your Mac, size it for this iPhone while you view it. The Mac gets its size back when you leave the terminal."
                             ))
                             .font(.caption)
                             .foregroundStyle(.secondary)

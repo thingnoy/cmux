@@ -117,8 +117,9 @@ public final class MobileDisplaySettings {
     }
 
     /// Whether an inactive iPhone releases its terminal viewport so a Mac can
-    /// take the grid. Defaults to `false`, preserving the host policy and the
-    /// last confirmed grid across a background/foreground transition.
+    /// take the grid. Defaults to `true`: a phone that put itself first in a
+    /// priority policy would otherwise keep the Mac at its size while in the
+    /// background. The cost is one resize when the phone comes back.
     public var handoffTerminalSizingWhenInactive: Bool {
         didSet {
             defaults.set(
@@ -264,7 +265,7 @@ public final class MobileDisplaySettings {
         self.useLegacyTerminalSizing = defaults.object(forKey: Self.useLegacyTerminalSizingKey) as? Bool ?? false
         self.handoffTerminalSizingWhenInactive = defaults.object(
             forKey: Self.handoffTerminalSizingWhenInactiveKey
-        ) as? Bool ?? false
+        ) as? Bool ?? true
         self.fillScreenWhenShared = MobileTerminalFillScreenPreference(defaults: defaults).isEnabled
         self.hapticFeedbackEnabled = haptics.isEnabled
         self.terminalScrollbackRows = MobileTerminalScrollbackPreference.resolve(from: defaults)

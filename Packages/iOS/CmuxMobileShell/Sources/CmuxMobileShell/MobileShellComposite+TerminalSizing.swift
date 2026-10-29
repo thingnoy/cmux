@@ -103,15 +103,15 @@ extension MobileShellComposite {
         claimTerminalFillScreenIfNeeded(surfaceID: surfaceID)
     }
 
-    /// Lets a letterboxed phone take a terminal it shares under the default
-    /// policy: follow the latest device, with this phone counted, so the grid
-    /// fills whichever device was used last.
+    /// Lets a letterboxed phone take a terminal it shares: this phone counts
+    /// and comes first in a priority policy, so the grid fills it while it
+    /// shows the terminal and returns to the Mac when it leaves.
     private func claimTerminalFillScreenIfNeeded(surfaceID: String) {
         guard !terminalFillScreenClaimedSurfaceIDs.contains(surfaceID),
               let surface = terminalSizingBySurfaceID[surfaceID],
-              surface.state?.isFillScreenClaimable(
-                  by: surface.selfParticipantID ?? defaultTerminalParticipantID
-              ) == true,
+              let policy = surface.state?.fillScreenPolicy(
+                  for: surface.selfParticipantID ?? defaultTerminalParticipantID
+              ),
               MobileTerminalFillScreenPreference(defaults: terminalFillScreenDefaults).isEnabled
         else { return }
         terminalFillScreenClaimedSurfaceIDs.insert(surfaceID)
@@ -119,7 +119,7 @@ extension MobileShellComposite {
             // Counts first: under fit-everyone it leaves the grid unchanged, so
             // the phone never briefly shows the Mac's grid between the two.
             guard await setTerminalCountsOverride(true, surfaceID: surfaceID),
-                  await setTerminalSizePolicy(.latest, surfaceID: surfaceID) else {
+                  await setTerminalSizePolicy(policy, surfaceID: surfaceID) else {
                 terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
                 return
             }
