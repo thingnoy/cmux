@@ -1714,6 +1714,8 @@ public final class MobileShellComposite: MobileTerminalOutputSinking {
     // Fit everyone, with no counts choice, is claimed again; persist the ids
     // per Mac if that shows up.
     @ObservationIgnored var terminalFillScreenClaimedSurfaceIDs: Set<String> = []
+    /// Terminals whose phone is re-sending its counts claim after a hand-off.
+    @ObservationIgnored var terminalFillScreenRecountingSurfaceIDs: Set<String> = []
     /// Monotonic viewport fences scoped to the Mac app instance that consumes
     /// them. Warm Iroh focus swaps keep both peer connections alive, so their
     /// counters must survive independently for the signed-in account lifetime.
