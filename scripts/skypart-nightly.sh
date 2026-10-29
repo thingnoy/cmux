@@ -31,6 +31,8 @@ notify() {
 }
 fail() { echo "FAIL: $1"; notify "ล้มเหลว: $1 (log: $LOG)"; exit 1; }
 
+trap 'notify "หยุดกลางทางที่บรรทัด $LINENO (log: $LOG)"' ERR
+
 LOCK="$LOG_DIR/.lock"
 mkdir "$LOCK" 2>/dev/null || { echo "another run holds $LOCK"; exit 0; }
 trap 'rmdir "$LOCK"' EXIT
@@ -105,7 +107,7 @@ git push -q fork "$BRANCH"
 
 LAST="$(python3 scripts/skypart-asc-notes.py --list | awk '{print $1}' | sort -n | tail -1)"
 BUILD=$((LAST + 1))
-OURS_LOG="$(git log --no-merges --format='- %s' "$UP..HEAD" -- . ':!scripts' | grep -E '^- (fix|feat)' | head -8)"
+OURS_LOG="$(git log --no-merges --format='- %s' "$UP..HEAD" -- . ':!scripts' | grep -E '^- (fix|feat)' | head -8 || true)"
 NOTES="Nightly: ของต้นทาง (main ${UP:0:11}) + ที่เราแก้
 ${UP_LOG:+
 ใหม่จากต้นทาง:
@@ -113,7 +115,7 @@ $UP_LOG
 }
 ที่เราแก้:
 ${OURS_LOG:-- (ไม่มี)}
-$([[ -f "${DECISION:-/nonexistent}" ]] && printf '\nเลือกระหว่างของเรากับต้นทาง:\n%s\n' "$(head -c 800 "$DECISION")")
+$([[ -f "${DECISION:-/nonexistent}" ]] && printf '\nเลือกระหว่างของเรากับต้นทาง:\n%s\n' "$(head -c 800 "$DECISION")" || true)
 ลองดู: ใช้งานตามปกติ ถ้าอะไรพังกว่า build ก่อน บอก Koki พร้อมภาพหน้าจอ"
 NOTES="${NOTES:0:3900}"
 
