@@ -22580,6 +22580,34 @@
         }
       }
     },
+    "mobile.settings.fillScreenWhenShared": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {"stringUnit": {"state": "translated", "value": "Fill Screen in Shared Terminals"}},
+        "ja": {"stringUnit": {"state": "translated", "value": "共有ターミナルで画面いっぱいに表示"}},
+        "de": {"stringUnit": {"state": "translated", "value": "Bildschirm in geteilten Terminals füllen"}},
+        "fr": {"stringUnit": {"state": "translated", "value": "Remplir l’écran dans les terminaux partagés"}},
+        "ar": {"stringUnit": {"state": "translated", "value": "ملء الشاشة في الطرفيات المشتركة"}},
+        "es": {"stringUnit": {"state": "translated", "value": "Llenar la pantalla en terminales compartidos"}},
+        "zh-Hant": {"stringUnit": {"state": "translated", "value": "在共用終端機中填滿螢幕"}},
+        "zh-Hans": {"stringUnit": {"state": "translated", "value": "在共享终端中填满屏幕"}},
+        "ko": {"stringUnit": {"state": "translated", "value": "공유 터미널에서 화면 채우기"}}
+      }
+    },
+    "mobile.settings.fillScreenWhenShared.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {"stringUnit": {"state": "translated", "value": "When a terminal is also open on your Mac, size it for this iPhone while you view it. The Mac gets its size back when you leave the terminal."}},
+        "ja": {"stringUnit": {"state": "translated", "value": "ターミナルがMacでも開いているときは、表示中はこのiPhoneに合わせてサイズを決めます。ターミナルを離れるとMacのサイズに戻ります。"}},
+        "de": {"stringUnit": {"state": "translated", "value": "Wenn ein Terminal auch auf Ihrem Mac geöffnet ist, richtet sich seine Größe nach diesem iPhone, solange Sie es ansehen. Der Mac erhält seine Größe zurück, wenn Sie das Terminal verlassen."}},
+        "fr": {"stringUnit": {"state": "translated", "value": "Lorsqu’un terminal est aussi ouvert sur votre Mac, l’adapter à cet iPhone tant que vous l’affichez. Le Mac retrouve sa taille quand vous quittez le terminal."}},
+        "ar": {"stringUnit": {"state": "translated", "value": "عندما تكون الطرفية مفتوحة أيضًا على جهاز Mac، يُضبط حجمها وفق هذا الـ iPhone أثناء عرضها. يستعيد Mac حجمه عند مغادرة الطرفية."}},
+        "es": {"stringUnit": {"state": "translated", "value": "Cuando un terminal también está abierto en tu Mac, ajustar su tamaño a este iPhone mientras lo ves. El Mac recupera su tamaño cuando sales del terminal."}},
+        "zh-Hant": {"stringUnit": {"state": "translated", "value": "終端機也在 Mac 上開啟時，在你檢視期間依這部 iPhone 調整大小。離開終端機後，Mac 會恢復原本的大小。"}},
+        "zh-Hans": {"stringUnit": {"state": "translated", "value": "终端也在 Mac 上打开时，在你查看期间按这部 iPhone 调整大小。离开终端后，Mac 会恢复原来的大小。"}},
+        "ko": {"stringUnit": {"state": "translated", "value": "터미널이 Mac에서도 열려 있으면 보는 동안 이 iPhone에 맞춰 크기를 조정합니다. 터미널을 나가면 Mac이 원래 크기로 돌아갑니다."}}
+      }
+    },
     "mobile.settings.handoffTerminalSizing": {
       "extractionState": "manual",
       "localizations": {

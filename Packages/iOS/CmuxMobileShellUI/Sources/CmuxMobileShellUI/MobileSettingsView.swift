@@ -323,6 +323,22 @@ struct MobileSettingsView: View {
                     }
                     .accessibilityIdentifier("MobileSettingsHandoffTerminalSizingToggle")
 
+                    Toggle(isOn: $displaySettings.fillScreenWhenShared) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.string(
+                                "mobile.settings.fillScreenWhenShared",
+                                defaultValue: "Fill Screen in Shared Terminals"
+                            ))
+                            Text(L10n.string(
+                                "mobile.settings.fillScreenWhenShared.description",
+                                defaultValue: "When a terminal is also open on your Mac, size it for this iPhone while you view it. The Mac gets its size back when you leave the terminal."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("MobileSettingsFillScreenWhenSharedToggle")
+
                     Button {
                         showingShortcuts = true
                     } label: {
