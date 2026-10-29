@@ -8,12 +8,14 @@ import Testing
 
 // A phone sharing a terminal with the same user's Mac under the default
 // fit-everyone policy gets min(Mac, phone) and letterboxes. With the
-// fill-screen preference on, the phone switches that terminal to follow the
-// latest device and counts itself, once, so it fills while in use.
+// fill-screen preference on, the phone counts itself and puts itself first in
+// a priority policy, once, so it fills while it shows the terminal. Follow
+// latest is not enough: any Mac input resizes the grid under the phone.
 
 private let surfaceID = "live-terminal"
 private let phoneID = "mobile:phone"
 private let phoneViewport = (cols: 72, rows: 60)
+private let phonePriorityKey = "u_maya/iphone/phone-device"
 
 /// A connected phone with the terminal mounted at `phoneViewport`. The
 /// collector keeps the surface mounted; dropping it clears the reported
@@ -61,6 +63,7 @@ private func sizeStateEnvelope(
                 ["id": "c3", "user_id": "u_maya", "device_kind": "mac", "device_name": "Mac Studio",
                  "viewport": ["cols": 120, "rows": 44], "counts": true],
                 ["id": phoneID, "user_id": "u_maya", "device_kind": "iphone", "device_name": "iPhone",
+                 "device_id": "phone-device",
                  "viewport": ["cols": phoneViewport.cols, "rows": phoneViewport.rows], "counts": true,
                  "counts_override": phoneCountsOverride.map { $0 as Any } ?? NSNull()],
             ],
@@ -89,14 +92,16 @@ private func claimed(_ router: LivenessHostRouter, atLeast count: Int = 1) async
 
 @MainActor
 @Suite struct TerminalFillScreenClaimTests {
-    @Test func letterboxedPhoneClaimsLatestAndCountsOnce() async throws {
+    @Test func letterboxedPhoneClaimsPriorityAndCountsOnce() async throws {
         let router = LivenessHostRouter()
         let (store, output) = try await makeStore(router: router)
 
         store.handleTerminalSizeStateEvent(try sizeStateEnvelope())
 
         #expect(await router.waitForCount(of: "mobile.terminal.size_policy.set", atLeast: 1))
-        #expect(await router.requests(for: "mobile.terminal.size_policy.set").map(\.policyMode) == ["latest"])
+        let claims = await router.requests(for: "mobile.terminal.size_policy.set")
+        #expect(claims.map(\.policyMode) == ["priority"])
+        #expect(claims.map(\.policyPriority) == [[phonePriorityKey]])
         let overrideSent = try await pollUntil { await countsOverrideReports(router) == [true] }
         #expect(overrideSent, "the phone must count itself toward size")
 
@@ -117,9 +122,25 @@ private func claimed(_ router: LivenessHostRouter, atLeast count: Int = 1) async
         output.unmount()
     }
 
+    @Test func followLatestClaimFromBuildSevenMovesToPriority() async throws {
+        let router = LivenessHostRouter()
+        let (store, output) = try await makeStore(router: router)
+
+        store.handleTerminalSizeStateEvent(
+            try sizeStateEnvelope(grid: phoneViewport, policy: .latest, phoneCountsOverride: true)
+        )
+
+        #expect(await router.waitForCount(of: "mobile.terminal.size_policy.set", atLeast: 1))
+        let claims = await router.requests(for: "mobile.terminal.size_policy.set")
+        #expect(claims.map(\.policyMode) == ["priority"])
+        #expect(claims.map(\.policyPriority) == [[phonePriorityKey]])
+        output.unmount()
+    }
+
     @Test(arguments: [
         TerminalSizingPolicy.latest,
         TerminalSizingPolicy(mode: .priority, priority: ["u_maya/mac"]),
+        TerminalSizingPolicy(mode: .priority, priority: [phonePriorityKey]),
         TerminalSizingPolicy(mode: .smallest, priority: ["u_maya/mac"]),
     ])
     func userChosenPolicyIsLeftAlone(policy: TerminalSizingPolicy) async throws {

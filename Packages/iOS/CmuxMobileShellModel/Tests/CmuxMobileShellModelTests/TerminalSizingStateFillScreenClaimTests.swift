@@ -3,16 +3,26 @@ import CmuxTerminalSizing
 import Testing
 
 private let phoneID = "mobile:phone"
+private let phoneFirst = TerminalSizingPolicy(mode: .priority, priority: ["u_maya/iphone/phone-device"])
+
+private func phone(
+    viewport: TerminalGridSize? = TerminalGridSize(cols: 72, rows: 60),
+    countsOverride: Bool? = nil
+) -> TerminalSizingParticipant {
+    TerminalSizingParticipant(
+        id: phoneID,
+        userID: "u_maya",
+        deviceKind: .iphone,
+        deviceID: "phone-device",
+        viewport: viewport,
+        countsOverride: countsOverride
+    )
+}
 
 private func state(
     grid: TerminalGridSize = TerminalGridSize(cols: 72, rows: 44),
     policy: TerminalSizingPolicy = .fitEveryone,
-    phone: TerminalSizingParticipant? = TerminalSizingParticipant(
-        id: phoneID,
-        userID: "u_maya",
-        deviceKind: .iphone,
-        viewport: TerminalGridSize(cols: 72, rows: 60)
-    )
+    phone: TerminalSizingParticipant? = phone()
 ) -> TerminalSizingState {
     let mac = TerminalSizingParticipant(
         id: "c3",
@@ -33,23 +43,42 @@ private func state(
 }
 
 @Suite struct TerminalSizingStateFillScreenClaimTests {
-    @Test func letterboxedInEitherDimensionIsClaimable() {
-        #expect(state().isFillScreenClaimable(by: phoneID))
-        #expect(state(grid: TerminalGridSize(cols: 60, rows: 60)).isFillScreenClaimable(by: phoneID))
+    @Test func letterboxedInEitherDimensionPutsThisPhoneFirst() {
+        #expect(state().fillScreenPolicy(for: phoneID) == phoneFirst)
+        #expect(state(grid: TerminalGridSize(cols: 60, rows: 60)).fillScreenPolicy(for: phoneID) == phoneFirst)
     }
 
-    @Test func gridThatFillsThePhoneIsNotClaimable() {
-        #expect(!state(grid: TerminalGridSize(cols: 72, rows: 60)).isFillScreenClaimable(by: phoneID))
+    @Test func gridThatFillsThePhoneUnderTheDefaultIsLeftAlone() {
+        #expect(state(grid: TerminalGridSize(cols: 72, rows: 60)).fillScreenPolicy(for: phoneID) == nil)
     }
 
-    @Test func fixedPolicyIsNotClaimable() {
+    /// Build 7 set follow-latest with the phone counted. Any Mac keystroke then
+    /// resized the grid under the phone, so that claim moves to priority even
+    /// while the phone currently fills.
+    @Test func followLatestWithThisPhoneCountedMovesToPriority() {
+        let claimed = state(
+            grid: TerminalGridSize(cols: 72, rows: 60),
+            policy: .latest,
+            phone: phone(countsOverride: true)
+        )
+        #expect(claimed.fillScreenPolicy(for: phoneID) == phoneFirst)
+    }
+
+    @Test func followLatestWithoutTheCountsClaimIsLeftAlone() {
+        #expect(state(policy: .latest).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(policy: .latest, phone: phone(countsOverride: false)).fillScreenPolicy(for: phoneID) == nil)
+    }
+
+    @Test func otherPoliciesAndCountsChoicesAreLeftAlone() {
         let fixed = TerminalSizingPolicy(mode: .fixed, fixed: TerminalGridSize(cols: 60, rows: 30))
-        #expect(!state(policy: fixed).isFillScreenClaimable(by: phoneID))
+        #expect(state(policy: fixed).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(policy: phoneFirst).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(phone: phone(countsOverride: true)).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(phone: phone(countsOverride: false)).fillScreenPolicy(for: phoneID) == nil)
     }
 
-    @Test func phoneMissingFromStateOrWithoutViewportIsNotClaimable() {
-        #expect(!state(phone: nil).isFillScreenClaimable(by: phoneID))
-        let noViewport = TerminalSizingParticipant(id: phoneID, deviceKind: .iphone)
-        #expect(!state(phone: noViewport).isFillScreenClaimable(by: phoneID))
+    @Test func phoneMissingFromStateOrWithoutViewportIsLeftAlone() {
+        #expect(state(phone: nil).fillScreenPolicy(for: phoneID) == nil)
+        #expect(state(phone: phone(viewport: nil)).fillScreenPolicy(for: phoneID) == nil)
     }
 }

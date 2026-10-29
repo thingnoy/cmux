@@ -35,6 +35,7 @@ actor LivenessHostRouter {
         var deviceKind: String?
         var deviceName: String?
         var policyMode: String?
+        var policyPriority: [String]?
         var countsOverride: Bool?
     }
 
@@ -141,6 +142,7 @@ actor LivenessHostRouter {
         deviceKind: String? = nil,
         deviceName: String? = nil,
         policyMode: String? = nil,
+        policyPriority: [String]? = nil,
         countsOverride: Bool? = nil
     ) {
         recorded.append(RecordedRequest(
@@ -160,6 +162,7 @@ actor LivenessHostRouter {
             deviceKind: deviceKind,
             deviceName: deviceName,
             policyMode: policyMode,
+            policyPriority: policyPriority,
             countsOverride: countsOverride
         ))
         resumeSatisfiedCountWaiters()
@@ -908,6 +911,7 @@ actor LivenessTransport: CmxByteTransport, CmxByteTransportLivenessObserving {
                 deviceKind: params?["device_kind"] as? String,
                 deviceName: params?["device_name"] as? String,
                 policyMode: (params?["policy"] as? [String: Any])?["mode"] as? String,
+                policyPriority: (params?["policy"] as? [String: Any])?["priority"] as? [String],
                 countsOverride: params?["counts_override"] as? Bool
             )
             // Answer each request concurrently so one held response cannot
