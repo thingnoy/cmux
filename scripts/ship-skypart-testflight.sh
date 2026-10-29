@@ -36,6 +36,10 @@ NSE_ENTITLEMENTS="$WORK/NotificationService.entitlements"
 cp ios/Config/NotificationService.entitlements "$NSE_ENTITLEMENTS"
 /usr/libexec/PlistBuddy -c 'Delete :com.apple.security.application-groups' "$NSE_ENTITLEMENTS"
 
+# Release archives build wireguard-go for the CloudVPN target and fail closed
+# without Go. Xcode phases do not see asdf's shims, so pass the real binary.
+export CMUX_WIREGUARD_GO_BINARY="${CMUX_WIREGUARD_GO_BINARY:-$(asdf which go 2>/dev/null || command -v go || true)}"
+[[ -x "$CMUX_WIREGUARD_GO_BINARY" ]] || { echo "FATAL: no Go toolchain (needed for wireguard-go)"; exit 1; }
 echo "== archive (build $BUILD_NUM)"
 xcodebuild archive -workspace ios/cmux.xcworkspace -scheme cmux-ios \
   -configuration Release -destination 'generic/platform=iOS' \
@@ -47,8 +51,10 @@ xcodebuild archive -workspace ios/cmux.xcworkspace -scheme cmux-ios \
   CURRENT_PROJECT_VERSION="$BUILD_NUM" \
   -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" \
-  | tail -3
-[[ -d "$ARCHIVE" ]] || { echo "FATAL: archive failed"; exit 1; }
+  >"$WORK/archive.log" 2>&1 || true
+tail -3 "$WORK/archive.log"
+[[ -d "$ARCHIVE" ]] || { grep -E "error:|failed" "$WORK/archive.log" | grep -v DVTDevice | head -20
+  echo "FATAL: archive failed (full log: $WORK/archive.log)"; exit 1; }
 
 echo "== export (manual App Store profiles; the ASC key has no cloud-signing permission)"
 python3 "$ROOT/scripts/skypart-asc-profiles.py" "$WORK/profiles.plist"
