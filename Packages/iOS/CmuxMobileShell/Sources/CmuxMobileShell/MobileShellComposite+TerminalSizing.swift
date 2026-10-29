@@ -107,21 +107,32 @@ extension MobileShellComposite {
     /// and comes first in a priority policy, so the grid fills it while it
     /// shows the terminal and returns to the Mac when it leaves.
     private func claimTerminalFillScreenIfNeeded(surfaceID: String) {
-        guard !terminalFillScreenClaimedSurfaceIDs.contains(surfaceID),
-              let surface = terminalSizingBySurfaceID[surfaceID],
-              let policy = surface.state?.fillScreenPolicy(
+        guard let surface = terminalSizingBySurfaceID[surfaceID],
+              let claim = surface.state?.fillScreenClaim(
                   for: surface.selfParticipantID ?? defaultTerminalParticipantID
               ),
               MobileTerminalFillScreenPreference(defaults: terminalFillScreenDefaults).isEnabled
         else { return }
-        terminalFillScreenClaimedSurfaceIDs.insert(surfaceID)
+        guard let policy = claim.policy else {
+            // Back from a hand-off: counting again repeats on every return, so
+            // only a request in flight blocks it.
+            guard terminalFillScreenRecountingSurfaceIDs.insert(surfaceID).inserted else { return }
+            Task {
+                _ = await setTerminalCountsOverride(true, surfaceID: surfaceID)
+                terminalFillScreenRecountingSurfaceIDs.remove(surfaceID)
+            }
+            return
+        }
+        guard terminalFillScreenClaimedSurfaceIDs.insert(surfaceID).inserted else { return }
         Task {
             // Counts first: under fit-everyone it leaves the grid unchanged, so
             // the phone never briefly shows the Mac's grid between the two.
-            guard await setTerminalCountsOverride(true, surfaceID: surfaceID),
-                  await setTerminalSizePolicy(policy, surfaceID: surfaceID) else {
+            if claim.countsThisPhone, !(await setTerminalCountsOverride(true, surfaceID: surfaceID)) {
                 terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
                 return
+            }
+            if !(await setTerminalSizePolicy(policy, surfaceID: surfaceID)) {
+                terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
             }
         }
     }
