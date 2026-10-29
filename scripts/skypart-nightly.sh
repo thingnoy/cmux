@@ -3,7 +3,7 @@
 # fixes) and ship it to the "cmux connect" TestFlight when the phone app changed.
 #
 #   scripts/skypart-nightly.sh            # normal run (launchd, 03:00)
-#   FORCE=1 scripts/skypart-nightly.sh    # ship even if upstream's phone code did not change
+#   FORCE=1 scripts/skypart-nightly.sh    # ship even if the phone code did not change since the last ship
 #   DRY_RUN=1 scripts/skypart-nightly.sh  # merge + test, no push, no ship
 #
 # A merge conflict, or upstream touching a file our own commits touch, goes to
@@ -46,8 +46,12 @@ PREV_UP="$(git merge-base HEAD origin/main)"
 UP="$(git rev-parse origin/main)"
 OURS_BEFORE="$(git rev-parse HEAD)"
 
-if git diff --quiet "$PREV_UP" "$UP" -- "${PHONE_PATHS[@]}" && [[ -z "${FORCE:-}" ]]; then
-  echo "upstream phone code unchanged since ${PREV_UP:0:11}; nothing to ship"
+SHIPPED_FILE="$LOG_DIR/last-shipped"
+SHIPPED="$(cat "$SHIPPED_FILE" 2>/dev/null || true)"
+if [[ -n "$SHIPPED" && -z "${FORCE:-}" ]] \
+  && git diff --quiet "$SHIPPED" "$UP" -- "${PHONE_PATHS[@]}" \
+  && git diff --quiet "$SHIPPED" HEAD -- "${PHONE_PATHS[@]}"; then
+  echo "phone code unchanged since the last shipped ${SHIPPED:0:11}; nothing to ship"
   exit 0
 fi
 
@@ -115,4 +119,5 @@ NOTES="${NOTES:0:3900}"
 
 echo "== ship build $BUILD"
 bash scripts/ship-skypart-testflight.sh "$BUILD" "$NOTES" || fail "ship of build $BUILD failed"
+git rev-parse HEAD >"$SHIPPED_FILE"
 notify "build $BUILD ขึ้น TestFlight แล้ว (main ${UP:0:11})"
