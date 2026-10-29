@@ -5,6 +5,7 @@
 #   scripts/skypart-nightly.sh            # normal run (launchd, 03:00)
 #   FORCE=1 scripts/skypart-nightly.sh    # ship even if the phone code did not change since the last ship
 #   DRY_RUN=1 scripts/skypart-nightly.sh  # merge + test, no push, no ship
+#   TEST_HINT="..." scripts/skypart-nightly.sh  # what the tester should poke at
 #
 # A merge conflict, or upstream touching a file our own commits touch, goes to
 # a headless Claude run that decides per fix: keep ours, or take upstream's when
@@ -116,7 +117,7 @@ $UP_LOG
 ที่เราแก้:
 ${OURS_LOG:-- (ไม่มี)}
 $([[ -f "${DECISION:-/nonexistent}" ]] && printf '\nเลือกระหว่างของเรากับต้นทาง:\n%s\n' "$(head -c 800 "$DECISION")" || true)
-ลองดู: ใช้งานตามปกติ ถ้าอะไรพังกว่า build ก่อน บอก Koki พร้อมภาพหน้าจอ"
+ลองดู: ${TEST_HINT:-เปิด terminal ที่ใช้บ่อยกับ browser pane แล้วใช้งานตามปกติ ถ้าอะไรพังกว่า build ก่อน ส่งภาพหน้าจอมา}"
 NOTES="${NOTES:0:3900}"
 
 echo "== ship build $BUILD"
