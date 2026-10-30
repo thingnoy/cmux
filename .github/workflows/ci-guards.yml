@@ -150,6 +150,10 @@ jobs:
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_ci_cloud_overflow_switch.py
 
+      - name: Validate the runner pools and their reconciler
+        if: ${{ matrix.group == 'ci' }}
+        run: python3 tests/test_ci_runner_pools.py
+
       - name: Validate fast checks fail over with the overflow switch
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_ci_fast_checks_failover.py
@@ -165,6 +169,10 @@ jobs:
       - name: Validate fast checks pin and launch their Playwright browsers
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_ci_fast_checks_browsers.py
+
+      - name: Validate fast checks prefetch SwiftPM binary artifacts
+        if: ${{ matrix.group == 'ci' }}
+        run: python3 tests/test_ci_fast_checks_swiftpm_artifacts.py
 
       - name: Validate guard failure attribution
         if: ${{ matrix.group == 'ci' }}
@@ -744,6 +752,10 @@ jobs:
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_nightly_next_cancelled_tip.py
 
+      - name: Validate the nightly-next tick cancels a run stuck without a runner
+        if: ${{ matrix.group == 'ci' }}
+        run: python3 tests/test_nightly_next_stuck_run.py
+
       - name: Validate CI queue janitor policy
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_ci_queue_janitor.py
@@ -853,6 +865,10 @@ jobs:
       - name: Validate CI health report
         if: ${{ matrix.group == 'ci' }}
         run: python3 tests/test_ci_health_report.py
+
+      - name: Validate the CI health report's Actions cache section
+        if: ${{ matrix.group == 'ci' }}
+        run: python3 tests/test_actions_cache_report.py
 
       - name: Validate runner label policy
         if: ${{ matrix.group == 'ci' }}
@@ -1465,6 +1481,7 @@ jobs:
           python3 tests/test_nightly_promotion_admission.py
           python3 tests/test_nightly_next_promotion_queue.py
           python3 tests/test_nightly_next_feed_watch.py
+          python3 tests/test_nightly_next_unsigned_resume.py
           python3 tests/test_nightly_next_rolling.py
           python3 tests/test_ci_nightly_push_throttle.py
           python3 tests/test_ci_nightly_off_blacksmith.py

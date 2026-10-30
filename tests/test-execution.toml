@@ -681,6 +681,10 @@ path = "tests/test_ci_health_report.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_actions_cache_report.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_runner_label_policy.py"
 lane = "linux-guard"
 
@@ -910,6 +914,10 @@ lane = "linux-guard"
 
 [[test]]
 path = "tests/test_nightly_next_rolling.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_nightly_next_unsigned_resume.py"
 lane = "linux-guard"
 
 [[test]]
@@ -1738,6 +1746,10 @@ path = "tests/test_nightly_next_cancelled_tip.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_nightly_next_stuck_run.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_github_token_budget.py"
 lane = "linux-guard"
 
@@ -1767,6 +1779,10 @@ lane = "linux-guard"
 
 [[test]]
 path = "tests/test_ci_cloud_overflow_switch.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_ci_runner_pools.py"
 lane = "linux-guard"
 
 [[test]]
@@ -1828,6 +1844,11 @@ lane = "linux-guard"
 [[test]]
 path = "tests/test_claude_hook_spool.py"
 lane = "macos-cli-product"
+requirements = ["cmux-cli"]
+
+[[test]]
+path = "tests/test_cli_kiro_global_hook_mutations.py"
+lane = "macos-cli-no-socket"
 requirements = ["cmux-cli"]
 
 [[test]]
@@ -2149,3 +2170,11 @@ lane = "linux-guard"
 path = "tests/test_cloud_capture_provision.py"
 lane = "manual"
 reason = "Run by hand before changing the Cloud capture provision scripts (docs/ci-sealed-secrets.md); it needs the system libsodium for the sealing round trip."
+
+[[test]]
+path = "tests/test_devbox_bubblewrap.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_ci_fast_checks_swiftpm_artifacts.py"
+lane = "linux-guard"
