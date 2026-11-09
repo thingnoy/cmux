@@ -172,6 +172,21 @@ class FakeAPI:
         self.cancelled_at, self.rerun_at = None, self.clock.seconds
 
 
+class BranchAPI(FakeAPI):
+    """A FakeAPI whose run names its branch, gone-branch, which `deleted` says was deleted."""
+
+    def __init__(self, *args, deleted: bool, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deleted = deleted
+
+    def run(self, run_id):
+        return {**super().run(run_id), "head_branch": "gone-branch"}
+
+    def branch_exists(self, branch):
+        self.calls.append(f"branch:{branch}?")
+        return not self.deleted
+
+
 def assert_left_at_open_head(case, api, text, number=42):
     """The rescue found the stuck job but cancelled nothing: the pull request is open at the run's head."""
     case.assertNotIn("cancel", api.calls)
@@ -1657,6 +1672,72 @@ class StrandedCancel(unittest.TestCase):
         self.assertEqual([path for path in asked if "/attempts/" in path],
                          ["/actions/runs/3/attempts/2/jobs?per_page=20", "/actions/runs/3/attempts/1/jobs?per_page=20"])
 
+    def test_rescue_history_can_narrow_events_and_sweeper_title_without_losing_attempts(self):
+        api = rescue.GitHub("t", "manaflow-ai/cmux")
+        asked = []
+        runs = [
+            {"id": 3, "event": "workflow_dispatch", "display_title": "owned-pool-sweeper",
+             "status": "completed", "conclusion": "failure", "run_attempt": 2,
+             "run_started_at": stamp(-60), "updated_at": stamp(0)},
+            {"id": 4, "event": "schedule", "display_title": "other", "status": "completed",
+             "conclusion": "failure", "run_attempt": 1, "run_started_at": stamp(-60), "updated_at": stamp(0)},
+        ]
+        def request(method, path, **_):
+            asked.append(path)
+            if path.startswith("/actions/workflows/"):
+                return {"workflow_runs": runs} if "&page=1&" in path else {}
+            attempt = int(path.split("/attempts/")[1].split("/")[0])
+            return {"jobs": [{"id": 30 + attempt, "status": "completed", "conclusion": "failure"}]}
+        api.request = request
+        self.assertEqual(api.rescue_jobs(START - dt.timedelta(seconds=600),
+                                         events=("schedule", "workflow_dispatch"),
+                                         titles=("owned-pool-sweeper",)), [32, 31])
+        self.assertTrue(all("&event=" in path for path in asked if path.startswith("/actions/workflows/")))
+
+    def test_filtered_rescue_history_merges_event_streams_newest_first(self):
+        api = rescue.GitHub("t", "manaflow-ai/cmux")
+        asked = []
+        rows = {
+            "schedule": [{"id": 10, "event": "schedule", "display_title": "owned-pool-sweeper",
+                           "status": "completed", "conclusion": "failure", "run_attempt": 1,
+                           "created_at": stamp(-120), "run_started_at": stamp(-120), "updated_at": stamp(-60)}],
+            "workflow_dispatch": [{"id": 20, "event": "workflow_dispatch", "display_title": "owned-pool-sweeper",
+                                    "status": "completed", "conclusion": "failure", "run_attempt": 1,
+                                    "created_at": stamp(-30), "run_started_at": stamp(-30), "updated_at": stamp(-10)}],
+        }
+        def request(method, path, **_):
+            asked.append(path)
+            if path.startswith("/actions/workflows/"):
+                event = path.split("&event=", 1)[1]
+                return {"workflow_runs": rows[event]} if "&page=1&" in path else {}
+            run_id = int(path.split("/runs/")[1].split("/")[0])
+            return {"jobs": [{"id": run_id, "status": "completed", "conclusion": "failure"}]}
+        api.request = request
+        self.assertEqual(api.rescue_jobs(START - dt.timedelta(seconds=600),
+                                         events=("schedule", "workflow_dispatch"),
+                                         titles=("owned-pool-sweeper",)), [20, 10])
+
+    def test_filtered_history_avoids_unrelated_workflow_run_page_cap(self):
+        api = rescue.GitHub("t", "manaflow-ai/cmux")
+        reads = []
+        def request(method, path, **_):
+            if path.startswith("/actions/workflows/"):
+                reads.append(path)
+                if "&event=" in path:
+                    return {"total_count": 1, "workflow_runs": [{
+                        "id": 9, "event": "schedule", "display_title": "owned-pool-sweeper",
+                        "status": "completed", "conclusion": "failure", "run_attempt": 1,
+                        "run_started_at": stamp(-60), "updated_at": stamp(0)}]} if "&page=1&" in path else {}
+                return {"total_count": 2501, "workflow_runs": []}
+            return {"jobs": [{"id": 90, "status": "completed", "conclusion": "failure"}]}
+        api.request = request
+        self.assertEqual(api.rescue_jobs(START - dt.timedelta(seconds=600),
+                                         events=("schedule",), titles=("owned-pool-sweeper",)), [90])
+        self.assertEqual(len(reads), 2)
+        with self.assertRaises(rescue.RescueHistoryCapped):
+            api.rescue_jobs(START - dt.timedelta(seconds=600))
+        self.assertEqual(len(reads), 3)
+
     def test_a_cancel_after_the_watch_looked_is_never_re_run(self):
         # The watch found a refusal; before rescue() read the run, someone cancelled it. No cancel was this rescue's.
         clock = Clock()
@@ -1738,6 +1819,15 @@ class StrandedCancel(unittest.TestCase):
             clock.sleep(60)
             self.assertEqual(self.follow(api, clock), f"stopped: the run was cancelled by @{CMUX_BOT}; left cancelled")
             self.assertEqual(mutations(api), [], rescue_log)
+
+    def test_a_publish_run_the_supersede_job_cancelled_stays_cancelled(self):
+        # cmux-next-dev-daily.yml's supersede job cancels an older DEV publish run with GITHUB_TOKEN
+        # (scripts/ci/cmux_next_dev_publish_supersede.py) and logs no rescue mark: no watch re-runs it.
+        clock = Clock()
+        api = CancelledAPI(clock, cancelled=True, note=f"The run was canceled by @{ACTIONS_BOT}.")
+        clock.advance(60)
+        self.assertEqual(self.follow(api, clock), f"stopped: the run was cancelled by @{ACTIONS_BOT}; left cancelled")
+        self.assertEqual(mutations(api), [])
 
     def test_someone_elses_cancel_is_final_even_beside_a_refusal(self):
         refused = {**refused_job("Verify signed cmux NEXT DEV (shard 2)", labels=(LIGHT,)), "id": 99}
@@ -2902,6 +2992,79 @@ class SideLanes(unittest.TestCase):
         outcome = rescue.follow(api, target, seconds=90, queue_rounds="0", now=clock.now, sleep=clock.sleep,
                                 log=lines.append)
         return api, outcome, "\n".join(lines)
+
+    def test_a_dispatch_whose_branch_was_deleted_is_not_re_run(self):
+        # Run 42502885663 (2026-11-08): a cmux-tui.yml dispatch on a pull request's branch; the pull request
+        # merged and its branch was deleted, then a re-run of the run failed to start (startup_failure: its
+        # local reusable workflow was not found). A refused leg of such a run is left as it is.
+        path = ".github/workflows/cmux-tui.yml"
+        target = rescue.target_from_event(side_event(path=path, event="workflow_dispatch", pull_requests=[]),
+                                          "manaflow-ai/cmux")
+        clock = Clock()
+        api = BranchAPI(clock, lambda seconds: self.cmux_tui_run(), finished=lambda seconds: True,
+                        conclusion="failure", rerun_jobs=lambda seconds: [],
+                        workflow=(ROOT / path).read_text(encoding="utf-8"), deleted=True)
+        lines: list[str] = []
+        outcome = rescue.follow(api, target, seconds=90, queue_rounds="0", now=clock.now, sleep=clock.sleep,
+                                log=lines.append)
+        self.assertNotIn("rerun-failed", api.calls, "\n".join(lines))
+        self.assertNotIn("rerun", api.calls)
+        self.assertIn("branch:gone-branch?", api.calls)
+        self.assertIn("gone-branch was deleted", outcome + "\n" + "\n".join(lines))
+
+    def test_an_unfinished_dispatch_whose_branch_was_deleted_is_never_cancelled(self):
+        # The queue rescue cancels a stuck dispatch and re-runs it on Blacksmith; with its branch gone the
+        # re-run cannot start, so the cancel alone would turn a queued run into a failure.
+        target = rescue.Target(RUN_ID, 1, HEAD, 0, path=".github/workflows/cmux-tui.yml", side=True,
+                               event="workflow_dispatch")
+        for deleted in (True, False):
+            with self.subTest(deleted=deleted):
+                clock = Clock()
+                api = BranchAPI(clock, lambda seconds: [job("test (macos)", labels=[SIDE])], deleted=deleted)
+                result = rescue.rescue(api, target, now=clock.now, sleep=clock.sleep, log=lambda _: None)
+                if deleted:
+                    self.assertNotIn("cancel", api.calls, result)
+                    self.assertNotIn("rerun", api.calls)
+                    self.assertIn("gone-branch was deleted", result)
+                else:
+                    self.assertIn("cancel", api.calls, result)
+
+    def test_a_branch_deleted_while_the_cancel_settles_is_not_re_run(self):
+        # The cancel already went out (this pass, or a resumed CANCEL_SENT); the re-run would fail to start.
+        target = rescue.Target(RUN_ID, 1, HEAD, 0, path=".github/workflows/cmux-tui.yml", side=True,
+                               event="workflow_dispatch")
+        clock = Clock()
+        api = BranchAPI(clock, lambda seconds: [job("test (macos)", labels=[SIDE])], deleted=True)
+        api.cancel(RUN_ID)
+        result = rescue.settle_and_rerun(api, target, now=clock.now, sleep=clock.sleep, log=lambda _: None,
+                                         failed_only=False, keep_main=False)
+        self.assertNotIn("rerun", api.calls, result)
+        self.assertNotIn("rerun-failed", api.calls)
+        self.assertIn("cancelled but not re-run", result)
+        self.assertIn("gone-branch was deleted", result)
+
+    def test_branch_exists_reads_the_branch_then_the_tag(self):
+        api = rescue.GitHub("t", "manaflow-ai/cmux")
+        for name, answers, want in [
+            ("a branch", {"/branches/feat%2Fx": 200}, True),
+            ("a tag, not a branch", {"/branches/feat%2Fx": 404, "/git/ref/tags/feat%2Fx": 200}, True),
+            ("neither", {"/branches/feat%2Fx": 404, "/git/ref/tags/feat%2Fx": 404}, False),
+        ]:
+            with self.subTest(name):
+                asked = []
+
+                def request(method, path, answers=answers, asked=asked, **_):
+                    asked.append(path)
+                    if answers[path] != 200:
+                        raise urllib.error.HTTPError(path, answers[path], "x", {}, None)
+                    return {}
+                api.request = request
+                self.assertIs(api.branch_exists("feat/x"), want)
+                self.assertEqual(asked, list(answers))
+        # Any other error is not an answer: it raises, so read() retries it.
+        api.request = lambda method, path, **_: (_ for _ in ()).throw(urllib.error.HTTPError(path, 502, "x", {}, None))
+        with self.assertRaises(urllib.error.HTTPError):
+            api.branch_exists("feat/x")
 
     def test_an_always_aggregator_failed_only_by_a_refused_leg_does_not_block_its_rerun(self):
         # cmux-tui.yml's hosted-verification (`if: always()`, needs every leg) fails when the macOS test

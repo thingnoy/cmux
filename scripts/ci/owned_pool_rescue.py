@@ -2128,31 +2128,57 @@ class GitHub:
                 break
         return found
 
-    def rescue_jobs(self, earliest_end: dt.datetime, run_id: int = 0) -> list[int]:
+    def rescue_jobs(self, earliest_end: dt.datetime, run_id: int = 0, *,
+                    events: Sequence[str] | None = None,
+                    titles: Sequence[str] | None = None) -> list[int]:
         """The job ids of the finished ci-owned-pool-rescue.yml runs that ended at or after `earliest_end`,
         newest first (a sweeper or a single watch).
 
         Listed by creation, which precedes the start by the run's wait in the sweeper's concurrency group: at most
-        the one sweeper ahead of it (it never cancels in progress, so one waits), RESCUE_JOB_LIFETIME_SECONDS."""
+        the one sweeper ahead of it (it never cancels in progress, so one waits), RESCUE_JOB_LIFETIME_SECONDS.
+        Optional event filters are sent to GitHub; title filters are applied locally because the API has no title
+        filter. Consumers that own only one kind of rescue receipt should use both."""
         since = (earliest_end - dt.timedelta(seconds=2 * RESCUE_JOB_LIFETIME_SECONDS)).astimezone(dt.timezone.utc)
+        event_filter = tuple(dict.fromkeys(str(event) for event in (events or ()) if event))
+        title_filter = frozenset(str(title) for title in (titles or ()) if title)
         runs: list[Mapping[str, Any]] = []
-        for page in range(1, RESCUE_RUN_PAGES + 1):
-            # Every status: a rescue run re-run is in progress while its earlier attempts' finished jobs hold marks.
-            data = self.request("GET", f"/actions/workflows/{RESCUE_WORKFLOW_FILE}/runs?per_page=100"
-                                       f"&page={page}&created=%3E%3D{since.strftime('%Y-%m-%dT%H:%M:%SZ')}")
-            batch = [run for run in (data or {}).get("workflow_runs") or [] if isinstance(run, Mapping)]
-            runs += batch
-            total = (data or {}).get("total_count") if isinstance(data, Mapping) else None
-            if page == 1 and isinstance(total, int) and total > 100 * RESCUE_RUN_PAGES:
-                # GitHub already counts more than the pages would hold: the other nine pages would only end in the
-                # same RescueHistoryCapped. The window holds every skipped rescue run too (360 an hour on
-                # 2026-10-30), so every read of it ended here, after ten charged pages, 64 times in one sweeper.
-                raise RescueHistoryCapped(f"{total} rescue runs in the window, more than {RESCUE_RUN_PAGES} pages")
-            # A page can come back short before the last one (failed_runs()): only an empty one ends.
-            if not batch:
-                break
-        else:
-            raise RescueHistoryCapped(f"{RESCUE_RUN_PAGES} pages of rescue runs and no end")
+        # Every status: a rescue run re-run is in progress while its earlier attempts' finished jobs hold marks.
+        # Separate event listings are merged below so the caller still reads logs newest first.
+        for event in event_filter or (None,):
+            for page in range(1, RESCUE_RUN_PAGES + 1):
+                path = (f"/actions/workflows/{RESCUE_WORKFLOW_FILE}/runs?per_page=100"
+                        f"&page={page}&created=%3E%3D{since.strftime('%Y-%m-%dT%H:%M:%SZ')}")
+                if event is not None:
+                    path += f"&event={urllib.parse.quote(event, safe='')}"
+                data = self.request("GET", path)
+                raw_batch = [run for run in (data or {}).get("workflow_runs") or [] if isinstance(run, Mapping)]
+                batch = raw_batch
+                if event is not None:
+                    batch = [run for run in batch if run.get("event") == event]
+                if title_filter:
+                    batch = [run for run in batch
+                             if str(run.get("display_title") or run.get("name") or "") in title_filter]
+                runs += batch
+                total = (data or {}).get("total_count") if isinstance(data, Mapping) else None
+                if page == 1 and isinstance(total, int) and total > 100 * RESCUE_RUN_PAGES:
+                    raise RescueHistoryCapped(f"{total} rescue runs in the window, more than {RESCUE_RUN_PAGES} pages")
+                # A short page is not necessarily the end; only an empty page ends the listing.
+                if not raw_batch:
+                    break
+            else:
+                raise RescueHistoryCapped(f"{RESCUE_RUN_PAGES} pages of rescue runs and no end")
+        unique: dict[tuple[int, int], Mapping[str, Any]] = {}
+        for run in runs:
+            key = (int(run.get("id") or 0), int(run.get("run_attempt") or 1))
+            unique.setdefault(key, run)
+        runs = list(unique.values())
+        if event_filter or title_filter:
+            # Filtered event streams are merged here. Keep the newest completed rescue job first so a later
+            # CANCEL_SETTLED mark wins over an older CANCEL_SENT when callers use setdefault while reading logs.
+            runs.sort(key=lambda run: (
+                parse_time(run.get("created_at")) or parse_time(run.get("run_started_at"))
+                or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+                int(run.get("id") or 0), int(run.get("run_attempt") or 1)), reverse=True)
         found: list[int] = []
         for run in runs:
             attempts = int(run.get("run_attempt") or 1)
@@ -2394,6 +2420,20 @@ class GitHub:
 
     def branch_head(self, branch: str) -> str:
         return str(((self.request("GET", f"/branches/{branch}") or {}).get("commit") or {}).get("sha") or "")
+
+    def branch_exists(self, branch: str) -> bool:
+        """Whether the run's ref still exists as a branch or a tag (a dispatch on a tag names the tag as its
+        head_branch). False only when both answer 404; other errors raise, so read() retries them."""
+        name = urllib.parse.quote(branch, safe='')
+        for path in (f"/branches/{name}", f"/git/ref/tags/{name}"):
+            try:
+                self.request("GET", path)
+            except urllib.error.HTTPError as error:
+                if error.code == 404:
+                    continue
+                raise
+            return True
+        return False
 
     def cancel(self, run_id: int, before_send: Callable[[], None] | None = None) -> None:
         """`before_send` runs right before the cancel is sent, after any token mint, and before every re-send
@@ -3237,7 +3277,7 @@ def e2e_build_unfinished(api: GitHub, target: Target, sleep: Callable[[float], N
 # cmux NEXT's nightly appcast (nightly.yml's NIGHTLY_NEXT_FEED_BASE). A nightly build number is its run id and a
 # two-digit attempt (4119158082902 is run 41191580829, attempt 2), and publish-nightly refuses a build no newer
 # than the feed's, so a nightly-next run older than the feed's newest build's run can never publish there.
-NEXT_FEED_URL = "https://files-next.cmux.com/nightly-next/next/appcast-arm64.xml"
+NEXT_FEED_URL = "https://files-next.cmux.com/nightly-next/appcast-arm64.xml"  # the one cmux NIGHTLY feed (#36287); /next/ froze on 2026-11-05
 _FEED_VERSION = re.compile(r"<sparkle:version>\s*(\d+)\s*</sparkle:version>")
 # glaeda's job-started hook refuses an owned-Mac signing job when scripts/ci/glaeda-signing-hooks.txt at the run's
 # own commit does not list the mini's hook. A re-run runs that same commit, so it is refused the same way every
@@ -4504,6 +4544,9 @@ def rescue(api: GitHub, target: Target, *, now: Callable[[], dt.datetime], sleep
     run = read(lambda: api.run(target.run_id), sleep, log)
     if int(run.get("run_attempt") or 0) != target.attempt:
         return "not rescued: someone else already re-ran the run"
+    gone = deleted_branch(api, target, run, sleep, log)
+    if gone:
+        return f"not rescued: {gone}; left as it is"
     failover = ""
     plan: PlacementRerun | None = None
     only_job: int | None = None
@@ -4605,6 +4648,25 @@ def rescue(api: GitHub, target: Target, *, now: Callable[[], dt.datetime], sleep
     return result
 
 
+def deleted_branch(api: GitHub, target: Target, run: Mapping[str, Any], sleep: Callable[[float], None],
+                   log: Callable[[str], None]) -> str:
+    """Why a dispatched run cannot be re-run, or "": its branch was deleted.
+
+    A re-run reads the workflow's local reusable workflows (`uses: ./.github/workflows/...`) from the run's
+    branch, so once the branch is gone every re-run ends in startup_failure at once. Run 42502885663
+    (cmux-tui.yml, dispatched on tui-main-registry-repair-tabs): its pull request merged and the branch was
+    deleted at 17:21:34Z on 2026-11-08; this rescue cancelled attempt 1 and its re-run, attempt 2, failed
+    to start ("error parsing called workflow ... workflow was not found"). Such a run is left as it is,
+    queued or running, never cancelled. Only dispatched runs with no pull request, main or push branch
+    are read here: those rules already cover the others."""
+    if target.pr_number or target.main or target.nightly or target.push_branch:
+        return ""
+    branch = str(run.get("head_branch") or "")
+    if not branch or read(lambda: api.branch_exists(branch), sleep, log):
+        return ""
+    return f"its branch {branch} was deleted, so a re-run could not load its workflow (startup_failure)"
+
+
 # The (run id, attempt) pairs this process logged CANCEL_SETTLED for. Its own log is unreadable until its job
 # ends (rescue_jobs() skips the reader's own run), so a later watch in the same sweeper reads this instead.
 SETTLED_HERE: set[tuple[int, int]] = set()
@@ -4678,6 +4740,10 @@ def settle_and_rerun(api: GitHub, target: Target, *, now: Callable[[], dt.dateti
     moved = "" if keep_main else pull_moved(api, target, sleep, log)
     if moved:
         return f"cancelled but not re-run: {moved}"
+    # The branch can go while the cancel settles, or before a resumed CANCEL_SENT: a re-run would only fail to start.
+    gone = deleted_branch(api, target, run, sleep, log)
+    if gone:
+        return f"cancelled but not re-run: {gone}"
     if failed_only and only_job is not None:
         try:
             api.rerun_job(target.run_id, only_job, target.attempt + 1)
