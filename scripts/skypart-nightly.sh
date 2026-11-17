@@ -61,7 +61,6 @@ if [[ -n "$SHIPPED" && -z "${FORCE:-}" ]] \
   exit 0
 fi
 
-UP_LOG="$(git log --no-merges --format='- %s' "$PREV_UP..$UP" -- "${PHONE_PATHS[@]}" | head -15)"
 OURS_FILES="$(git diff --name-only "$PREV_UP" HEAD | grep -v '^scripts/' || true)"
 UP_FILES="$(git diff --name-only "$PREV_UP" "$UP")"
 OVERLAP="$(comm -12 <(sort <<<"$OURS_FILES") <(sort <<<"$UP_FILES") || true)"
@@ -111,16 +110,28 @@ git push -q fork "$BRANCH"
 
 LAST="$(python3 scripts/skypart-asc-notes.py --list | awk '{print $1}' | sort -n | tail -1)"
 BUILD=$((LAST + 1))
-OURS_LOG="$(git log --no-merges --format='- %s' "$UP..HEAD" -- . ':!scripts' | grep -E '^- (fix|feat)' | head -8 || true)"
-NOTES="Nightly: ของต้นทาง (main ${UP:0:11}) + ที่เราแก้
-${UP_LOG:+
-ใหม่จากต้นทาง:
-$UP_LOG
-}
-ที่เราแก้:
-${OURS_LOG:-- (ไม่มี)}
+# Only what changed since the last shipped build, not everything we carry.
+SINCE_UP="$(git merge-base "${SHIPPED:-$PREV_UP}" "$UP")"
+UP_NEW="$(git log --no-merges --format='- %s' "$SINCE_UP..$UP" -- "${PHONE_PATHS[@]}" | head -15)"
+OURS_NEW="$(git log --no-merges --format='- %s' "${SHIPPED:-$PREV_UP}..HEAD" -- . ':!scripts' \
+  | grep -E '^- (fix|feat)' | head -8 || true)"
+CHANGES="${UP_NEW:+จากต้นทาง:
+$UP_NEW
+}${OURS_NEW:+จากเรา:
+$OURS_NEW
+}"
+SUMMARY=""
+if [[ -n "$CHANGES" ]]; then
+  SUMMARY="$(claude -p "สรุปการเปลี่ยนแปลงของแอป iOS นี้ให้คนเทสบน TestFlight เป็นภาษาไทย สั้นๆ
+บรรทัดละข้อ ขึ้นต้นด้วย '- ' บอกว่าในแอปจะเห็นอะไรต่างไป ถ้าเป็นเรื่องภายในที่คนเทสไม่เห็น ให้รวมเป็นข้อเดียวว่า 'ปรับภายใน ไม่เห็นความต่าง'
+จากนั้นขึ้นบรรทัด 'ลองดู: ' ตามด้วยสิ่งเดียวที่ควรลองมากที่สุด ตอบแค่ข้อความนี้ ไม่ต้องมีอย่างอื่น
+$CHANGES" 2>/dev/null)" || SUMMARY=""
+fi
+NOTES="build $BUILD เทียบกับ build $LAST (main ${UP:0:11})
+
+${SUMMARY:-${CHANGES:-ไม่มีโค้ดแอปเปลี่ยน เป็นแอปเดิม build ใหม่}}
 $([[ -f "${DECISION:-/nonexistent}" ]] && printf '\nเลือกระหว่างของเรากับต้นทาง:\n%s\n' "$(head -c 800 "$DECISION")" || true)
-ลองดู: ${TEST_HINT:-เปิด terminal ที่ใช้บ่อยกับ browser pane แล้วใช้งานตามปกติ ถ้าอะไรพังกว่า build ก่อน ส่งภาพหน้าจอมา}"
+${TEST_HINT:+ลองดู: $TEST_HINT}"
 NOTES="${NOTES:0:3900}"
 
 echo "== ship build $BUILD"
