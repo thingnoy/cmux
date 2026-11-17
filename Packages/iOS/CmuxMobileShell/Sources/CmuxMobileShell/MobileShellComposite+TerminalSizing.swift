@@ -1,3 +1,4 @@
+internal import CMUXMobileCore
 internal import CmuxMobileDiagnostics
 internal import CmuxMobileRPC
 public import CmuxMobileShellModel
@@ -99,6 +100,41 @@ extension MobileShellComposite {
         // `.reassertViewport` is carried by `viewportReassertGeneration`,
         // which the mounted surface observes.
         terminalSizingBySurfaceID[surfaceID] = surface
+        claimTerminalFillScreenIfNeeded(surfaceID: surfaceID)
+    }
+
+    /// Lets a letterboxed phone take a terminal it shares: this phone counts
+    /// and comes first in a priority policy, so the grid fills it while it
+    /// shows the terminal and returns to the Mac when it leaves.
+    private func claimTerminalFillScreenIfNeeded(surfaceID: String) {
+        guard let surface = terminalSizingBySurfaceID[surfaceID],
+              let claim = surface.state?.fillScreenClaim(
+                  for: surface.selfParticipantID ?? defaultTerminalParticipantID
+              ),
+              MobileTerminalFillScreenPreference(defaults: terminalFillScreenDefaults).isEnabled
+        else { return }
+        guard let policy = claim.policy else {
+            // Back from a hand-off: counting again repeats on every return, so
+            // only a request in flight blocks it.
+            guard terminalFillScreenRecountingSurfaceIDs.insert(surfaceID).inserted else { return }
+            Task {
+                _ = await setTerminalCountsOverride(true, surfaceID: surfaceID)
+                terminalFillScreenRecountingSurfaceIDs.remove(surfaceID)
+            }
+            return
+        }
+        guard terminalFillScreenClaimedSurfaceIDs.insert(surfaceID).inserted else { return }
+        Task {
+            // Counts first: under fit-everyone it leaves the grid unchanged, so
+            // the phone never briefly shows the Mac's grid between the two.
+            if claim.countsThisPhone, !(await setTerminalCountsOverride(true, surfaceID: surfaceID)) {
+                terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
+                return
+            }
+            if !(await setTerminalSizePolicy(policy, surfaceID: surfaceID)) {
+                terminalFillScreenClaimedSurfaceIDs.remove(surfaceID)
+            }
+        }
     }
 
     /// Applies a `detached` push.

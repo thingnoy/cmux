@@ -115,10 +115,12 @@ import Testing
         #expect(!MobileDisplaySettings(defaults: defaults).useLegacyTerminalSizing)
     }
 
-    @Test func handoffTerminalSizingDefaultsToOffWithoutAWrite() throws {
+    /// On by default so a phone that put itself first in a priority policy
+    /// returns the grid to the Mac once it goes to the background.
+    @Test func handoffTerminalSizingDefaultsToOnWithoutAWrite() throws {
         let defaults = try makeDefaults("handoffTerminalSizingDefaults")
         let settings = MobileDisplaySettings(defaults: defaults)
-        #expect(!settings.handoffTerminalSizingWhenInactive)
+        #expect(settings.handoffTerminalSizingWhenInactive)
         #expect(defaults.object(forKey: "cmux.mobile.handoffTerminalSizingWhenInactive") == nil)
     }
 
