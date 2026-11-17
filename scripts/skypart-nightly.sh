@@ -22,7 +22,8 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-26.3.0.app/Contents/D
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 # Upstream paths that end up in the iOS app.
 PHONE_PATHS=(ios Packages/iOS Packages/Shared Packages/macOS/CmuxCloudTunnelCore Packages/macOS/CmuxPhonePush
-  ghostty vendor/bonsplit vendor/WireGuardKit vendor/stack-auth-swift-sdk-prerelease)
+  ghostty vendor/bonsplit vendor/WireGuardKit vendor/stack-auth-swift-sdk-prerelease
+  ":(exclude,glob)**/Tests/**")
 
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG") 2>&1
