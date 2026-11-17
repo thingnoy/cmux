@@ -101,15 +101,22 @@ import Testing
         let router = RoutingHostRouter()
         let store = try await makeRoutingConnectedStore(
             router: router,
-            reconnectAttemptDeadlineNanoseconds: 300_000_000
+            reconnectAttemptDeadlineNanoseconds: 100_000_000
         )
         store.selectTerminal(MobileTerminalPreview.ID(rawValue: Self.terminalID))
         store.terminalInputText = "hello"
         _ = try retireClientForRecovery(store)
 
         let submit = Task { await store.submitComposer() }
-        // Past the first wait's deadline, inside where a second wait would run.
-        try await Task.sleep(for: .milliseconds(450))
+        #expect(try await pollUntil { !store.composerSendClientWaiters.isEmpty })
+        // End the first wait past its deadline ourselves: its timeout task can
+        // fire late on a loaded machine, and the late client must not wake it.
+        try await Task.sleep(for: .milliseconds(100))
+        store.resumeComposerSendClientWaiters()
+        #expect(try await pollUntil {
+            store.terminalSendStatus(forTerminalID: Self.terminalID) == .failed
+                || !store.composerSendClientWaiters.isEmpty
+        })
         let lateRouter = RoutingHostRouter()
         try installFreshRemoteClient(on: store, router: lateRouter, macDeviceID: "test-mac")
 
