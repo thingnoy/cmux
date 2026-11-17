@@ -21,7 +21,8 @@ CMUX=/Applications/cmux.app/Contents/Resources/bin/cmux
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-26.3.0.app/Contents/Developer}"
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 # Upstream paths that end up in the iOS app.
-PHONE_PATHS=(ios Packages/iOS Packages/Shared ghostty vendor/bonsplit)
+PHONE_PATHS=(ios Packages/iOS Packages/Shared Packages/macOS/CmuxCloudTunnelCore Packages/macOS/CmuxPhonePush
+  ghostty vendor/bonsplit vendor/WireGuardKit vendor/stack-auth-swift-sdk-prerelease)
 
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG") 2>&1
@@ -51,8 +52,10 @@ OURS_BEFORE="$(git rev-parse HEAD)"
 
 SHIPPED_FILE="$LOG_DIR/last-shipped"
 SHIPPED="$(cat "$SHIPPED_FILE" 2>/dev/null || true)"
+# Compare upstream with the upstream already in the last ship, not with the
+# ship itself: the ship carries our fixes, so it always differs from main.
 if [[ -n "$SHIPPED" && -z "${FORCE:-}" ]] \
-  && git diff --quiet "$SHIPPED" "$UP" -- "${PHONE_PATHS[@]}" \
+  && git diff --quiet "$(git merge-base "$SHIPPED" "$UP")" "$UP" -- "${PHONE_PATHS[@]}" \
   && git diff --quiet "$SHIPPED" HEAD -- "${PHONE_PATHS[@]}"; then
   echo "phone code unchanged since the last shipped ${SHIPPED:0:11}; nothing to ship"
   exit 0
